@@ -247,3 +247,23 @@ This document tracks the chronological engineering progress, completed milestone
 
 ### Next Planned Milestone
 - Implement CSV & JSON Data Export / Import and Database Backup (`focusflow/utils/export_import.py`).
+
+---
+
+## Milestone 11: Data Export, Import & Backup
+
+### Date: 2026-09-22
+
+### Completed
+- Implemented `focusflow/utils/export_import.py`:
+  - CSV export for recorded Pomodoro sessions (`focus_sessions.csv`) with task metadata and duration.
+  - CSV export for all tasks (`tasks.csv`) with status, priorities, tags, and progress metrics.
+  - Complete JSON backup and restore with deduplication on task and session UUIDs.
+  - Local database snapshot backup utility (`focusflow_backup_YYYYMMDD_HHMMSS.db`).
+- Created `tests/test_export_import.py` validating full JSON round-trip serialization and database backup generation (2/2 tests passing).
+
+### Git Commits
+- `feat(data): implement CSV and JSON export, import, and backup utilities`
+
+### Next Planned Milestone
+- Implement Main Application Orchestrator and Comprehensive Verification (`focusflow/app.py`, `run.py`).
