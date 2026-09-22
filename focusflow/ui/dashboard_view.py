@@ -81,6 +81,44 @@ class DashboardView(QWidget):
         metrics_layout.addWidget(self.stat_streak_card)
         container_layout.addLayout(metrics_layout)
 
+        # Daily Goal Progress Card
+        self.goal_card = QFrame()
+        self.goal_card.setProperty("class", "Card")
+        goal_layout = QVBoxLayout(self.goal_card)
+        goal_layout.setContentsMargins(18, 14, 18, 14)
+        goal_layout.setSpacing(8)
+
+        goal_header = QHBoxLayout()
+        goal_title = QLabel("🎯 Daily Focus Goal")
+        goal_title.setStyleSheet("font-weight: bold; color: #ffffff; font-size: 13px;")
+        goal_header.addWidget(goal_title)
+        goal_header.addStretch()
+
+        self.lbl_goal_stats = QLabel("0m / 2h (0%)")
+        self.lbl_goal_stats.setStyleSheet("color: #a6adc8; font-weight: 600; font-size: 12px;")
+        goal_header.addWidget(self.lbl_goal_stats)
+        goal_layout.addLayout(goal_header)
+
+        from PyQt6.QtWidgets import QProgressBar
+        self.goal_progress = QProgressBar()
+        self.goal_progress.setRange(0, 100)
+        self.goal_progress.setValue(0)
+        self.goal_progress.setTextVisible(False)
+        self.goal_progress.setFixedHeight(8)
+        self.goal_progress.setStyleSheet("""
+            QProgressBar {
+                background-color: #181825;
+                border-radius: 4px;
+                border: none;
+            }
+            QProgressBar::chunk {
+                background-color: #10b981;
+                border-radius: 4px;
+            }
+        """)
+        goal_layout.addWidget(self.goal_progress)
+        container_layout.addWidget(self.goal_card)
+
         # 2. Main Timer Card
         timer_card = QFrame()
         timer_card.setProperty("class", "Card")
@@ -115,7 +153,7 @@ class DashboardView(QWidget):
         self.btn_play_pause.setProperty("class", "Primary")
         self.btn_play_pause.setMinimumSize(130, 42)
         self.btn_play_pause.setStyleSheet("font-size: 14px; font-weight: bold;")
-        self.btn_play_pause.clicked.connect(self.engine.toggle_play_pause)
+        self.btn_play_pause.clicked.connect(self._on_play_pause_clicked)
         controls_layout.addWidget(self.btn_play_pause)
 
         self.btn_stop = QPushButton("Stop")
@@ -218,6 +256,25 @@ class DashboardView(QWidget):
         self.task_combo.setCurrentIndex(selected_index)
         self.task_combo.blockSignals(False)
 
+    def _on_play_pause_clicked(self):
+        if self.engine.state == TimerState.IDLE:
+            if not self.engine.active_task_id and self.repo.get_preference("prompt_no_task", True):
+                from focusflow.ui.components.no_task_dialog import NoTaskDialog
+                from PyQt6.QtWidgets import QDialog
+                dlg = NoTaskDialog(self.task_manager, self)
+                if dlg.exec() == QDialog.DialogCode.Accepted:
+                    if dlg.dont_ask_again:
+                        self.repo.set_preference("prompt_no_task", False)
+                    if dlg.selected_task_id:
+                        self.engine.set_active_task(dlg.selected_task_id)
+                        self.refresh_tasks_dropdown()
+                    self.engine.start(task_id=dlg.selected_task_id)
+                    return
+                else:
+                    return # User cancelled
+
+        self.engine.toggle_play_pause()
+
     def refresh_dashboard(self):
         """Update metrics for today."""
         today_str = date.today().isoformat()
@@ -240,5 +297,12 @@ class DashboardView(QWidget):
         # Streak
         streak = self.repo.get_productivity_streak()
         self.stat_streak_card.findChild(QLabel, "metric_value").setText(f"{streak} days 🔥")
+
+        # Daily Goal Progress
+        goal_sec = int(self.repo.get_preference("daily_goal_seconds", 7200))
+        goal_hrs = goal_sec / 3600.0
+        pct = min(100, int((stats.total_focus_seconds / max(1, goal_sec)) * 100))
+        self.goal_progress.setValue(pct)
+        self.lbl_goal_stats.setText(f"{focus_str} / {goal_hrs:.1f}h ({pct}%)")
 
         self.refresh_tasks_dropdown()

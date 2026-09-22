@@ -402,3 +402,40 @@ This document tracks the chronological engineering progress, completed milestone
 
 ### Next Planned Milestone
 - Enhance Task ↔ Pomodoro workflow with no-task prompt and reliable counter increments.
+
+---
+
+## Milestone 18: Task ↔ Pomodoro Workflow & No-Task Prompt
+
+### Date: 2026-09-22
+
+### Completed
+- Implemented `focusflow/ui/components/no_task_dialog.py`:
+  - Interactive prompt when starting a session without an active task.
+  - Three distinct options: "Continue without Task" (general focus), "Select an Existing Task" (from pending tasks), or "Create New Task" (instant title entry and focus start).
+  - "Don't ask again" option saved in local preferences (`prompt_no_task`).
+- Enhanced `focusflow/ui/dashboard_view.py`:
+  - Hooked play/pause trigger into `NoTaskDialog` when starting from idle with no task selected.
+  - Verified 100% reliable transactional increment of task's `completed_pomodoros` and `total_focus_seconds`.
+
+---
+
+## Milestone 19: Daily Goal Progress Bar & Smart Productivity Insights
+
+### Date: 2026-09-22
+
+### Completed
+- Enhanced `focusflow/ui/dashboard_view.py`:
+  - Added dedicated Daily Focus Goal card featuring a styled progress bar and live ratio display (`1h 35m / 2.0h (78%)`).
+  - Automatically updates when focus sessions complete or durations change.
+- Enhanced `focusflow/db/repository.py`:
+  - Added `get_longest_streak()` to compute historical record streaks across all recorded daily statistics.
+- Enhanced `focusflow/ui/stats_view.py`:
+  - Added data-aware productivity insights: Peak focus period (Morning/Afternoon/Evening), average session length, current vs. record streak.
+  - Added empty state notice: *"Not enough data yet. Complete your first Pomodoro to start building your productivity history."* when less than 2 sessions exist.
+
+### Git Commits
+- `feat(dashboard): add visual daily goal progress, task selection prompt, and smart insights`
+
+### Next Planned Milestone
+- Implement Dedicated Session History View with timeline and date filters (`focusflow/ui/history_view.py`).

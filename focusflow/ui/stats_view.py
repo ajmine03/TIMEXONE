@@ -112,15 +112,30 @@ class StatsView(QWidget):
         insights_card.setProperty("class", "Card")
         ins_layout = QGridLayout(insights_card)
         ins_layout.setContentsMargins(18, 16, 18, 16)
-        ins_layout.setSpacing(16)
+        ins_layout.setSpacing(14)
+
+        ins_title = QLabel("💡 Productivity Insights")
+        ins_title.setStyleSheet("font-size: 15px; font-weight: bold; color: #ffffff;")
+        ins_layout.addWidget(ins_title, 0, 0, 1, 2)
+
+        self.lbl_empty_notice = QLabel("Not enough data yet. Complete your first Pomodoro to start building your productivity history.")
+        self.lbl_empty_notice.setStyleSheet("color: #a6adc8; font-style: italic; font-size: 12px; padding: 6px 0;")
+        self.lbl_empty_notice.setWordWrap(True)
+        ins_layout.addWidget(self.lbl_empty_notice, 1, 0, 1, 2)
 
         self.lbl_best_day = QLabel("—")
+        self.lbl_peak_period = QLabel("—")
+        self.lbl_avg_session = QLabel("—")
+        self.lbl_streak_info = QLabel("—")
         self.lbl_longest_session = QLabel("—")
         self.lbl_interruptions = QLabel("—")
 
-        self._add_insight_row(ins_layout, 0, "🏆 Most Productive Day:", self.lbl_best_day)
-        self._add_insight_row(ins_layout, 1, "⏱️ Longest Focus Session:", self.lbl_longest_session)
-        self._add_insight_row(ins_layout, 2, "⚠️ Total Interruptions:", self.lbl_interruptions)
+        self._add_insight_row(ins_layout, 2, "🏆 Most Productive Day:", self.lbl_best_day)
+        self._add_insight_row(ins_layout, 3, "🕒 Peak Focus Period:", self.lbl_peak_period)
+        self._add_insight_row(ins_layout, 4, "⏱️ Average Focus Session:", self.lbl_avg_session)
+        self._add_insight_row(ins_layout, 5, "🔥 Streak Records:", self.lbl_streak_info)
+        self._add_insight_row(ins_layout, 6, "🚀 Longest Single Session:", self.lbl_longest_session)
+        self._add_insight_row(ins_layout, 7, "⚠️ Interrupted Sessions:", self.lbl_interruptions)
 
         self.content_layout.addWidget(insights_card)
 
@@ -206,15 +221,44 @@ class StatsView(QWidget):
         distribution = self.repo.get_time_distribution(days=num_days)
         self.dist_bar.set_data(distribution)
 
-        # Insights
-        best_day_stat = max(stats_list, key=lambda s: s.total_focus_seconds) if stats_list else None
-        if best_day_stat and best_day_stat.total_focus_seconds > 0:
-            b_date = datetime.strptime(best_day_stat.date, "%Y-%m-%d").strftime("%A, %b %d")
-            b_mins = best_day_stat.total_focus_seconds // 60
-            self.lbl_best_day.setText(f"{b_date} ({b_mins} mins)")
-        else:
-            self.lbl_best_day.setText("None yet")
+        # Insights calculations
+        has_sufficient_data = (total_pomos >= 2)
+        self.lbl_empty_notice.setVisible(not has_sufficient_data)
 
-        long_mins = longest_session // 60
-        self.lbl_longest_session.setText(f"{long_mins} minutes" if long_mins > 0 else "—")
-        self.lbl_interruptions.setText(f"{total_interruptions} sessions interrupted")
+        if has_sufficient_data:
+            # Best day
+            best_day_stat = max(stats_list, key=lambda s: s.total_focus_seconds) if stats_list else None
+            if best_day_stat and best_day_stat.total_focus_seconds > 0:
+                b_date = datetime.strptime(best_day_stat.date, "%Y-%m-%d").strftime("%A, %b %d")
+                b_mins = best_day_stat.total_focus_seconds // 60
+                self.lbl_best_day.setText(f"{b_date} ({b_mins} mins)")
+            else:
+                self.lbl_best_day.setText("—")
+
+            # Peak Period
+            if sum(distribution.values()) > 0:
+                peak = max(distribution, key=distribution.get)
+                peak_mins = distribution[peak] // 60
+                self.lbl_peak_period.setText(f"{peak} ({peak_mins} mins)")
+            else:
+                self.lbl_peak_period.setText("—")
+
+            # Average session
+            avg_session = (total_seconds // max(1, total_pomos)) // 60
+            self.lbl_avg_session.setText(f"{avg_session} minutes")
+
+            # Streaks
+            cur_streak = self.repo.get_productivity_streak()
+            best_streak = self.repo.get_longest_streak()
+            self.lbl_streak_info.setText(f"{cur_streak} days current (record: {best_streak} days)")
+
+            long_mins = longest_session // 60
+            self.lbl_longest_session.setText(f"{long_mins} minutes" if long_mins > 0 else "—")
+            self.lbl_interruptions.setText(f"{total_interruptions} sessions")
+        else:
+            self.lbl_best_day.setText("Not enough data yet")
+            self.lbl_peak_period.setText("Not enough data yet")
+            self.lbl_avg_session.setText("Not enough data yet")
+            self.lbl_streak_info.setText("Not enough data yet")
+            self.lbl_longest_session.setText("—")
+            self.lbl_interruptions.setText(f"{total_interruptions} sessions")

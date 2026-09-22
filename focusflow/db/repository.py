@@ -410,6 +410,31 @@ class Repository:
                 break
         return streak
 
+    def get_longest_streak(self) -> int:
+        """Calculate the longest consecutive days of completed pomodoros."""
+        cursor = self.db.execute(
+            """
+            SELECT date
+            FROM daily_statistics
+            WHERE pomodoros_completed > 0
+            ORDER BY date ASC;
+            """
+        )
+        rows = cursor.fetchall()
+        if not rows:
+            return 0
+
+        dates = [datetime.strptime(r["date"], "%Y-%m-%d").date() for r in rows]
+        max_streak = 1
+        current = 1
+        for i in range(1, len(dates)):
+            if dates[i] == dates[i - 1] + timedelta(days=1):
+                current += 1
+                max_streak = max(max_streak, current)
+            elif dates[i] > dates[i - 1] + timedelta(days=1):
+                current = 1
+        return max_streak
+
     def get_time_distribution(self, days: int = 7) -> Dict[str, int]:
         """
         Group focus duration into morning (06:00-12:00),
