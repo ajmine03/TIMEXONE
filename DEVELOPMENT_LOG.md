@@ -54,3 +54,25 @@ This document tracks the chronological engineering progress, completed milestone
 
 ### Next Planned Milestone
 - Implement drift-free Pomodoro timer engine (`focusflow/core/timer.py`).
+
+---
+
+## Milestone 3: Drift-Free Pomodoro Timer Engine
+
+### Date: 2026-09-22
+
+### Completed
+- Implemented `focusflow/core/timer.py`:
+  - Defined explicit states via `TimerState` enum (`IDLE`, `RUNNING_FOCUS`, `PAUSED_FOCUS`, `RUNNING_SHORT_BREAK`, `PAUSED_SHORT_BREAK`, `RUNNING_LONG_BREAK`, `PAUSED_LONG_BREAK`).
+  - Implemented drift-free monotonic clock arithmetic (`time.monotonic()` target timestamps) with zero cumulative drift even across system sleep or thread stalls.
+  - Implemented controls: `start()`, `pause()`, `resume()`, `toggle_play_pause()`, `stop()`, `restart()`, and `skip()`.
+  - Automatic session logging with interruption detection (> 15s recorded as interrupted on manual stop).
+  - Configurable cycle transitions: auto-start breaks, long break triggering every N cycles, and task pomodoro increments.
+  - Event observer pattern for tick updates, state changes, and session completions.
+- Created `tests/test_timer.py` covering state transitions, break cycles, pause/resume, and clock drift resilience (5/5 tests passing).
+
+### Git Commits
+- `feat(timer): implement drift-free pomodoro timer engine with session recovery`
+
+### Next Planned Milestone
+- Implement Task Manager service and validation (`focusflow/core/task_manager.py`).
