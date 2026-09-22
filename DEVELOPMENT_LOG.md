@@ -202,3 +202,28 @@ This document tracks the chronological engineering progress, completed milestone
 
 ### Next Planned Milestone
 - Implement Settings, Autostart, Reminders & First-Run Wizard (`focusflow/ui/settings_view.py`, `focusflow/ui/wizard.py`, `focusflow/utils/autostart.py`, `focusflow/core/reminders.py`).
+
+---
+
+## Milestone 9: Settings, Autostart, Reminders & First-Run Wizard
+
+### Date: 2026-09-22
+
+### Completed
+- Implemented `focusflow/utils/autostart.py`:
+  - Standard XDG autostart file generation at `~/.config/autostart/focusflow.desktop`.
+  - Detection, enabling, and disabling routines for seamless user login launching.
+- Implemented `focusflow/core/reminders.py`:
+  - Periodic goal tracking service verifying daily focus hours and triggering notifications on goal achievement.
+- Implemented `focusflow/ui/wizard.py`:
+  - 4-step onboarding wizard for first launches: Welcome, Pomodoro duration selector, daily focus goal configuration, and autostart toggle.
+  - No account creation or cloud requirement.
+- Implemented `focusflow/ui/settings_view.py`:
+  - Comprehensive configuration tabs: Timer durations (focus, short break, long break, intervals), auto-start toggles, notification/sound preferences with test buttons, theme switching (Dark/Light), daily targets, and floating timer behavior.
+  - Direct parameter synchronization with `PomodoroEngine`.
+
+### Git Commits
+- `feat(settings): add comprehensive settings, autostart, and first-run wizard`
+
+### Next Planned Milestone
+- Implement Privacy-Safe Idle Detection & Session Tracking (`focusflow/core/tracker.py`).
