@@ -76,3 +76,25 @@ This document tracks the chronological engineering progress, completed milestone
 
 ### Next Planned Milestone
 - Implement Task Manager service and validation (`focusflow/core/task_manager.py`).
+
+---
+
+## Milestone 4: Persistent Task Management System
+
+### Date: 2026-09-22
+
+### Completed
+- Implemented `focusflow/core/task_manager.py`:
+  - Validated task attributes: title presence, priority (`low`, `medium`, `high`), ISO-8601 date parsing.
+  - CRUD operations and completion toggling with automatic completion timestamp management.
+  - Multi-mode filtering: All, Today, Upcoming, Completed, and High Priority.
+  - Sorting support: Created date (desc/asc), due date, priority, and remaining pomodoros.
+  - Aggregate tag discovery across all tasks.
+  - Observer subscriber pattern to automatically synchronize UI elements when tasks mutate.
+- Created `tests/test_tasks.py` verifying validation, completion toggles, tag aggregation, and filtered queries (4/4 tests passing).
+
+### Git Commits
+- `feat(tasks): implement persistent task management system`
+
+### Next Planned Milestone
+- Implement Linux Desktop Notifications, Audio Chime Player, and System Tray (`focusflow/ui/notifications.py`, `focusflow/utils/sound.py`, `focusflow/ui/tray.py`).
