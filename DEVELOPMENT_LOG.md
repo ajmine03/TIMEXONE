@@ -227,3 +227,23 @@ This document tracks the chronological engineering progress, completed milestone
 
 ### Next Planned Milestone
 - Implement Privacy-Safe Idle Detection & Session Tracking (`focusflow/core/tracker.py`).
+
+---
+
+## Milestone 10: Privacy-Safe Idle Detection & Tracking
+
+### Date: 2026-09-22
+
+### Completed
+- Implemented `focusflow/core/tracker.py`:
+  - Non-invasive user inactivity detection using Linux `libX11` / `libXss.so.1` (`XScreenSaverQueryInfo`) and Freedesktop DBus ScreenSaver fallback.
+  - Zero surveillance: no keylogging, no screenshotting, no browser monitoring, and no clipboard snooping.
+  - Configurable inactivity threshold and action handler (`pause`, `ask`, `continue`).
+  - Graceful tolerance for missing display or sandboxed permissions.
+- Created `tests/test_idle_detector.py` validating automated pause behavior on inactivity threshold breaches (2/2 tests passing).
+
+### Git Commits
+- `feat(tracking): implement privacy-focused idle and session tracking`
+
+### Next Planned Milestone
+- Implement CSV & JSON Data Export / Import and Database Backup (`focusflow/utils/export_import.py`).
