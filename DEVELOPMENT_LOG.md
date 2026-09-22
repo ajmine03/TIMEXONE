@@ -180,3 +180,25 @@ This document tracks the chronological engineering progress, completed milestone
 
 ### Next Planned Milestone
 - Implement Productivity Statistics, Charts, and Analytics (`focusflow/ui/components/charts.py`, `focusflow/ui/stats_view.py`).
+
+---
+
+## Milestone 8: Productivity Statistics, Analytics & Visual Charts
+
+### Date: 2026-09-22
+
+### Completed
+- Implemented `focusflow/ui/components/charts.py`:
+  - `WeeklyBarChart`: antialiased `QPainter` 7-day vector bar chart with dynamic scaling, rounded bars, values, and weekday labels.
+  - `TimeDistributionBar`: tri-color stacked progress bar for Morning, Afternoon, and Evening focus breakdown with an interactive legend.
+- Implemented `focusflow/ui/stats_view.py`:
+  - Period switcher (Last 7 Days vs Last 30 Days).
+  - Metric summary cards: Total Focus Time, Completed Pomodoros, Tasks Completed, and Daily Average.
+  - Productivity Insights section showing most productive day, longest single focus block, and total interruption count.
+- Created `tests/test_statistics.py` verifying date range zero-filling and time-of-day bucketing (2/2 tests passing).
+
+### Git Commits
+- `feat(stats): add daily, weekly, and monthly productivity visual analytics`
+
+### Next Planned Milestone
+- Implement Settings, Autostart, Reminders & First-Run Wizard (`focusflow/ui/settings_view.py`, `focusflow/ui/wizard.py`, `focusflow/utils/autostart.py`, `focusflow/core/reminders.py`).
