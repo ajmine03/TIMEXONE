@@ -20,9 +20,12 @@ XDG_DATA_HOME = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "s
 APP_CONFIG_DIR = XDG_CONFIG_HOME / "focusflow"
 APP_DATA_DIR = XDG_DATA_HOME / "focusflow"
 
-# Ensure runtime directories exist
-APP_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
+# Ensure runtime directories exist if writable
+try:
+    APP_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
+except OSError:
+    pass
 
 # Database file location
 DEFAULT_DB_PATH = APP_DATA_DIR / "focusflow.db"
