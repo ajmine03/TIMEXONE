@@ -146,6 +146,7 @@ class FocusFlowApp:
 
             # Refresh views
             self.main_window.dashboard_view.refresh_dashboard()
+            self.main_window.history_view.refresh_history()
             self.stats_view.refresh_stats()
 
         elif state in (TimerState.RUNNING_SHORT_BREAK, TimerState.RUNNING_LONG_BREAK):

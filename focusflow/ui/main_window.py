@@ -77,8 +77,9 @@ class MainWindow(QMainWindow):
         nav_items = [
             ("dashboard", "🏠  Dashboard", 0),
             ("tasks", "📋  Tasks", 1),
-            ("stats", "📊  Statistics", 2),
-            ("settings", "⚙️  Settings", 3),
+            ("history", "📜  History", 2),
+            ("stats", "📊  Statistics", 3),
+            ("settings", "⚙️  Settings", 4),
         ]
 
         for key, label, index in nav_items:
@@ -116,18 +117,21 @@ class MainWindow(QMainWindow):
         # Instantiate views
         self.dashboard_view = DashboardView(self.engine, self.task_manager, self.repo)
         self.tasks_view = TasksView(self.task_manager, self.engine)
+        from focusflow.ui.history_view import HistoryView
+        self.history_view = HistoryView(self.repo)
 
         # When user clicks "Focus" on a task in tasks_view, switch to dashboard
         self.tasks_view.focus_task_requested.connect(self._on_task_focus_requested)
 
         self.stack.addWidget(self.dashboard_view) # Index 0
         self.stack.addWidget(self.tasks_view)      # Index 1
+        self.stack.addWidget(self.history_view)    # Index 2
 
-        # Placeholder widgets for stats and settings (populated in upcoming milestones)
+        # Placeholder widgets for stats and settings
         self.stats_placeholder = QWidget()
         self.settings_placeholder = QWidget()
-        self.stack.addWidget(self.stats_placeholder)    # Index 2
-        self.stack.addWidget(self.settings_placeholder) # Index 3
+        self.stack.addWidget(self.stats_placeholder)    # Index 3
+        self.stack.addWidget(self.settings_placeholder) # Index 4
 
         content_layout.addWidget(self.stack)
         root_layout.addWidget(self.content_pane, stretch=1)
@@ -165,7 +169,7 @@ class MainWindow(QMainWindow):
         self.activateWindow()
 
     def show_settings(self):
-        self._on_nav_clicked(3, "settings")
+        self._on_nav_clicked(4, "settings")
         self.show()
         self.raise_()
         self.activateWindow()
@@ -173,12 +177,12 @@ class MainWindow(QMainWindow):
     def set_stats_view(self, view_widget: QWidget):
         """Replace the placeholder stats view."""
         self.stack.removeWidget(self.stats_placeholder)
-        self.stack.insertWidget(2, view_widget)
+        self.stack.insertWidget(3, view_widget)
 
     def set_settings_view(self, view_widget: QWidget):
         """Replace the placeholder settings view."""
         self.stack.removeWidget(self.settings_placeholder)
-        self.stack.insertWidget(3, view_widget)
+        self.stack.insertWidget(4, view_widget)
 
     def apply_theme(self, theme_name: str = "dark"):
         if theme_name == "light":

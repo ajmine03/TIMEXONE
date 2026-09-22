@@ -439,3 +439,26 @@ This document tracks the chronological engineering progress, completed milestone
 
 ### Next Planned Milestone
 - Implement Dedicated Session History View with timeline and date filters (`focusflow/ui/history_view.py`).
+
+---
+
+## Milestone 20: Dedicated Session History Timeline View
+
+### Date: 2026-09-22
+
+### Completed
+- Implemented `focusflow/ui/history_view.py`:
+  - Chronological session timeline grouping records by date (Today, Yesterday, Weekday dates).
+  - Detailed cards with start—end timestamps, task association (or General Focus), duration, session type, and status badges (Completed / Interrupted).
+  - Flexible date filter pills: *Today, Yesterday, Last 7 Days, Last 30 Days, All Time*.
+  - Real-time search bar filtering across task names and session types.
+  - Live summary banner calculating total focus time and completed count for the active filter.
+- Updated `focusflow/ui/main_window.py`:
+  - Added `📜 History` tab to the primary sidebar navigation.
+  - Wired real-time automatic refreshes upon session completion.
+
+### Git Commits
+- `feat(history): implement session history timeline view with date filters`
+
+### Next Planned Milestone
+- Implement Error Logging, Diagnostics Viewer & Rolling Database Backups (`focusflow/config.py`, `focusflow/utils/export_import.py`, `focusflow/ui/settings_view.py`).
