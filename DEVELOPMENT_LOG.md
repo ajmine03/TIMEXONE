@@ -313,3 +313,28 @@ This document tracks the chronological engineering progress, completed milestone
 
 ### Next Planned Milestone
 - Complete comprehensive README.md, documentation, tag v0.1.0 release, and guide remote GitHub push.
+
+---
+
+## Milestone 14: Release v0.1.0, Documentation & Final Verification
+
+### Date: 2026-09-22
+
+### Completed
+- Completed comprehensive `README.md`:
+  - Complete feature tour with badge details.
+  - In-depth architectural evaluation explaining why PyQt6 was selected over GTK4 for native Linux floating widgets and system tray integration.
+  - Complete directory tree and responsibility breakdown.
+  - Installation instructions via Debian `.deb` package (`sudo dpkg -i ...`) and source checkout.
+  - Keyboard shortcuts table.
+  - Automated test execution commands and results (19/19 passing).
+  - Explicit privacy statement and roadmap.
+- Validated Debian package generation via `packaging/build_deb.sh`, producing `packaging/dist/focusflow_0.1.0-1_all.deb`.
+- Verified headless execution with `python3 run.py --test-mode`.
+- Ready for git tag `v0.1.0`.
+
+### Git Commits
+- `docs: complete user guide, packaging instructions, and release v0.1.0`
+
+### Status
+- **MVP Complete & Verified**: FocusFlow is ready for local production use and Debian/Parrot/Ubuntu deployment.
