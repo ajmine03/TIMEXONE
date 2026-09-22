@@ -159,3 +159,24 @@ This document tracks the chronological engineering progress, completed milestone
 
 ### Next Planned Milestone
 - Implement Always-On-Top Draggable Floating Timer Widget (`focusflow/ui/floating_timer.py`).
+
+---
+
+## Milestone 7: Always-On-Top Draggable Floating Timer Widget
+
+### Date: 2026-09-22
+
+### Completed
+- Implemented `focusflow/ui/floating_timer.py`:
+  - Utilized `WindowStaysOnTopHint | FramelessWindowHint | Tool` for distraction-free floating over all Linux desktop windows.
+  - Smooth mouse drag-to-move across monitors with persistence of window coordinates (`floating_x`, `floating_y`).
+  - Dynamic opacity control (from 50% to 100% translucent background).
+  - Compact micro-widget mode toggle (`150x68` minimal bar vs `220x140` standard card).
+  - Live state badges, active task name clipping, and direct Play/Pause/Stop/Skip actions.
+  - Multi-window signal synchronization with `MainWindow` and `SystemTrayManager`.
+
+### Git Commits
+- `feat(floating): create always-on-top draggable floating timer widget`
+
+### Next Planned Milestone
+- Implement Productivity Statistics, Charts, and Analytics (`focusflow/ui/components/charts.py`, `focusflow/ui/stats_view.py`).
