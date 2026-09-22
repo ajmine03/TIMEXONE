@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1e2e"/>
+      <stop offset="100%" stop-color="#11111b"/>
+    </linearGradient>
+    <linearGradient id="primaryGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06b6d4"/>
+      <stop offset="50%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <filter id="dropShadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <!-- Base App Tile (Squircle) -->
+  <rect x="16" y="16" width="224" height="224" rx="52" fill="url(#bgGrad)" filter="url(#dropShadow)" stroke="#313244" stroke-width="2"/>
+
+  <!-- Outer Progress Arc Ring -->
+  <circle cx="128" cy="128" r="82" fill="none" stroke="#313244" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="128" cy="128" r="82" fill="none" stroke="url(#primaryGrad)" stroke-width="12" stroke-linecap="round"
+          stroke-dasharray="515" stroke-dashoffset="140" transform="rotate(-90 128 128)"/>
+
+  <!-- Inner Dial Background -->
+  <circle cx="128" cy="128" r="64" fill="#181825"/>
+
+  <!-- Productivity Center Symbol (Stylized Stopwatch & Checkmark) -->
+  <!-- Top button -->
+  <rect x="120" y="36" width="16" height="12" rx="4" fill="url(#primaryGrad)"/>
+
+  <!-- Tick marks at 12, 3, 6, 9 -->
+  <circle cx="128" cy="74" r="3" fill="#6c7086"/>
+  <circle cx="182" cy="128" r="3" fill="#6c7086"/>
+  <circle cx="128" cy="182" r="3" fill="#6c7086"/>
+  <circle cx="74" cy="128" r="3" fill="#6c7086"/>
+
+  <!-- Focus / Check / Flow glyph in center -->
+  <path d="M102 128 L120 146 L156 106" fill="none" stroke="url(#accentGrad)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Subtle Glowing Core Point -->
+  <circle cx="128" cy="128" r="4" fill="#a6e3a1" opacity="0.8"/>
+</svg>
