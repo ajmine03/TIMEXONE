@@ -124,3 +124,38 @@ This document tracks the chronological engineering progress, completed milestone
 
 ### Next Planned Milestone
 - Implement Modern Linux Desktop UI, Styles, and Productivity Dashboard (`focusflow/ui/`).
+
+---
+
+## Milestone 6: Modern Linux Desktop UI & Productivity Dashboard
+
+### Date: 2026-09-22
+
+### Completed
+- Implemented `focusflow/ui/styles.py`:
+  - Native Linux dark and light themes (GNOME Adwaita & KDE Breeze inspired color tokens).
+  - Modern typography, rounded cards, subtle border contrasts, accessible status indicators.
+- Implemented `focusflow/ui/components/timer_display.py`:
+  - Antialiased `QPainter` circular progress ring with gradient fills.
+  - State-aware badge pills (`FOCUS`, `SHORT BREAK`, `LONG BREAK`, `PAUSED`).
+  - Crisp typography scaling dynamically with window size.
+- Implemented `focusflow/ui/dashboard_view.py`:
+  - Real-time productivity metrics: Today's Focused Time, Completed Pomodoros, Remaining Tasks, Daily Streak.
+  - Active task selector dropdown linked to Pomodoro sessions.
+  - Responsive action controls: Start/Pause, Stop, Skip, and Restart.
+- Implemented `focusflow/ui/tasks_view.py`:
+  - Full task management interface with filter pills (All, Today, Upcoming, High Priority, Completed).
+  - Search bar and sorting by newest, oldest, priority, due date, and remaining pomodoros.
+  - Rich task cards with completion checkbox, priority color badges, pomodoro progress (`🍅 3/5`), due dates, and tags.
+  - Interactive Add/Edit Task modal dialog with validation.
+  - Direct "Focus" action button to bind any task instantly to the active timer.
+- Implemented `focusflow/ui/main_window.py`:
+  - Sidebar navigation host with `QStackedWidget`.
+  - Keyboard shortcuts: `Ctrl+Alt+Space` (play/pause), `Ctrl+Alt+S` (stop), `Ctrl+Alt+F` (floating timer), `Ctrl+Alt+N` (new task).
+  - Graceful minimize-to-tray on close when timer is running.
+
+### Git Commits
+- `feat(ui): implement modern Linux desktop dashboard and task manager UI`
+
+### Next Planned Milestone
+- Implement Always-On-Top Draggable Floating Timer Widget (`focusflow/ui/floating_timer.py`).
