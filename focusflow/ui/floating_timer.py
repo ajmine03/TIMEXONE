@@ -21,6 +21,8 @@ class FloatingTimerWidget(QWidget):
 
     visibility_changed = pyqtSignal(bool)
     open_dashboard_requested = pyqtSignal()
+    open_settings_requested = pyqtSignal()
+    quit_requested = pyqtSignal()
 
     def __init__(
         self,
@@ -45,6 +47,7 @@ class FloatingTimerWidget(QWidget):
         self._drag_pos = QPoint()
         self.is_compact = False
         self.opacity = 0.95
+        self.auto_hide_controls = bool(self.repo.get_preference("floating_auto_hide_controls", False))
 
         self._init_ui()
         self._load_saved_geometry()
@@ -135,7 +138,9 @@ class FloatingTimerWidget(QWidget):
         self.card_layout.addWidget(self.task_label)
 
         # 4. Control Buttons Row (Play/Pause, Stop, Dashboard)
-        self.controls_row = QHBoxLayout()
+        self.controls_container = QWidget()
+        self.controls_row = QHBoxLayout(self.controls_container)
+        self.controls_row.setContentsMargins(0, 0, 0, 0)
         self.controls_row.setSpacing(6)
         self.controls_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -157,7 +162,12 @@ class FloatingTimerWidget(QWidget):
         self.btn_more.clicked.connect(self._show_options_menu)
         self.controls_row.addWidget(self.btn_more)
 
-        self.card_layout.addLayout(self.controls_row)
+        self.card_layout.addWidget(self.controls_container)
+
+        if self.auto_hide_controls:
+            self.controls_container.hide()
+            self.btn_compact_toggle.hide()
+            self.btn_close.hide()
 
         root_layout.addWidget(self.frame)
         self.resize(220, 140)
@@ -181,21 +191,18 @@ class FloatingTimerWidget(QWidget):
         self.is_compact = not self.is_compact
         if self.is_compact:
             self.task_label.hide()
-            self.controls_row.setEnabled(False)
-            # Hide individual widgets in controls row
-            self.btn_play_pause.hide()
-            self.btn_stop.hide()
-            self.btn_more.hide()
+            self.controls_container.hide()
             self.state_label.hide()
             self.time_label.setStyleSheet("color: #ffffff; font-size: 20px; font-weight: bold;")
             self.resize(150, 68)
         else:
             self.task_label.show()
-            self.btn_play_pause.show()
-            self.btn_stop.show()
-            self.btn_more.show()
             self.state_label.show()
             self.time_label.setStyleSheet("color: #ffffff; font-size: 26px; font-weight: bold;")
+            if not self.auto_hide_controls:
+                self.controls_container.show()
+                self.btn_compact_toggle.show()
+                self.btn_close.show()
             self.resize(220, 140)
 
     def _on_tick(self, remaining: int, total: int, fraction: float):
@@ -239,30 +246,127 @@ class FloatingTimerWidget(QWidget):
         self._update_display(self.engine.remaining_seconds)
 
     def _show_options_menu(self):
+        self._open_context_menu(self.btn_more.mapToGlobal(QPoint(0, self.btn_more.height())))
+
+    def contextMenuEvent(self, event):
+        self._open_context_menu(event.globalPos())
+        event.accept()
+
+    def _open_context_menu(self, global_pos: QPoint):
         menu = QMenu(self)
 
-        act_dash = QAction("Open Dashboard", self)
-        act_dash.triggered.connect(self.open_dashboard_requested.emit)
-        menu.addAction(act_dash)
+        # Title
+        title_act = QAction("<b>FocusFlow</b>", self)
+        title_act.setEnabled(False)
+        menu.addAction(title_act)
+        menu.addSeparator()
 
-        act_skip = QAction("Skip to Next", self)
+        # Timer Controls
+        if self.engine.state.is_running:
+            act_play = QAction("Pause Timer", self)
+            act_play.triggered.connect(self.engine.pause)
+            menu.addAction(act_play)
+        elif self.engine.state.is_paused:
+            act_play = QAction("Resume Timer", self)
+            act_play.triggered.connect(self.engine.resume)
+            menu.addAction(act_play)
+        else:
+            act_play = QAction("Start Pomodoro", self)
+            act_play.triggered.connect(self.engine.start)
+            menu.addAction(act_play)
+
+        act_stop = QAction("Stop Timer", self)
+        act_stop.triggered.connect(self.engine.stop)
+        act_stop.setEnabled(self.engine.state != TimerState.IDLE)
+        menu.addAction(act_stop)
+
+        act_skip = QAction("Skip Session", self)
         act_skip.triggered.connect(self.engine.skip)
         menu.addAction(act_skip)
 
-        act_compact = QAction("Compact View" if not self.is_compact else "Expanded View", self)
-        act_compact.triggered.connect(self.toggle_compact_mode)
-        menu.addAction(act_compact)
+        menu.addSeparator()
+
+        # Navigation & Tasks
+        act_dash = QAction("Show Dashboard", self)
+        act_dash.triggered.connect(self.open_dashboard_requested.emit)
+        menu.addAction(act_dash)
+
+        # Change Task Submenu
+        task_menu = menu.addMenu("Change Task")
+        act_no_task = QAction("None (General Focus)", self)
+        act_no_task.triggered.connect(lambda: self.engine.set_active_task(None))
+        task_menu.addAction(act_no_task)
+        task_menu.addSeparator()
+
+        tasks = self.task_manager.list(filter_mode="all")
+        for t in tasks:
+            if t.status != "completed":
+                t_act = QAction(f"{t.title} ({t.completed_pomodoros}/{t.estimated_pomodoros} 🍅)", self)
+                t_act.triggered.connect(lambda ch, tid=t.id: self.engine.set_active_task(tid))
+                task_menu.addAction(t_act)
 
         menu.addSeparator()
 
-        # Opacity presets
+        # Appearance & Modes
+        act_compact = QAction("Compact Mode", self)
+        act_compact.setCheckable(True)
+        act_compact.setChecked(self.is_compact)
+        act_compact.triggered.connect(self.toggle_compact_mode)
+        menu.addAction(act_compact)
+
+        act_autohide = QAction("Hide Controls Automatically", self)
+        act_autohide.setCheckable(True)
+        act_autohide.setChecked(self.auto_hide_controls)
+        act_autohide.triggered.connect(self.toggle_auto_hide_controls)
+        menu.addAction(act_autohide)
+
+        # Opacity Submenu
         op_menu = menu.addMenu("Opacity")
         for val, label in [(1.0, "100%"), (0.85, "85%"), (0.70, "70%"), (0.50, "50%")]:
             op_act = QAction(label, self)
+            op_act.setCheckable(True)
+            op_act.setChecked(abs(self.opacity - val) < 0.05)
             op_act.triggered.connect(lambda ch, v=val: self.set_opacity(v))
             op_menu.addAction(op_act)
 
-        menu.exec(self.btn_more.mapToGlobal(QPoint(0, self.btn_more.height())))
+        menu.addSeparator()
+
+        # Settings & Quit
+        act_settings = QAction("Settings", self)
+        act_settings.triggered.connect(self.open_settings_requested.emit)
+        menu.addAction(act_settings)
+
+        act_quit = QAction("Quit", self)
+        act_quit.triggered.connect(self.quit_requested.emit)
+        menu.addAction(act_quit)
+
+        menu.exec(global_pos)
+
+    def toggle_auto_hide_controls(self):
+        self.auto_hide_controls = not self.auto_hide_controls
+        self.repo.set_preference("floating_auto_hide_controls", self.auto_hide_controls)
+        if self.auto_hide_controls and not self.is_compact:
+            self.controls_container.hide()
+            self.btn_compact_toggle.hide()
+            self.btn_close.hide()
+        else:
+            self.controls_container.show()
+            self.btn_compact_toggle.show()
+            self.btn_close.show()
+
+    def enterEvent(self, event):
+        super().enterEvent(event)
+        if self.auto_hide_controls and not self.is_compact:
+            self.controls_container.show()
+            self.btn_compact_toggle.show()
+            self.btn_close.show()
+
+    def leaveEvent(self, event):
+        super().leaveEvent(event)
+        if self.auto_hide_controls and not self.is_compact:
+            self.controls_container.hide()
+            self.btn_compact_toggle.hide()
+            self.btn_close.hide()
 
     def set_opacity(self, value: float):
         self.opacity = value

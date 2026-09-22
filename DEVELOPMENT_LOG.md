@@ -383,3 +383,22 @@ This document tracks the chronological engineering progress, completed milestone
 
 ### Next Planned Milestone
 - Enhance Floating Timer with right-click context menu, auto-hide controls, and task switching.
+
+---
+
+## Milestone 17: Floating Timer Context Menu, Auto-Hide Controls & Task Switcher
+
+### Date: 2026-09-22
+
+### Completed
+- Enhanced `focusflow/ui/floating_timer.py`:
+  - Implemented rich right-click context menu (`contextMenuEvent`) with actions for Start/Pause/Resume, Stop, Skip, Show Dashboard, Task selection submenu, Compact Mode toggle, Opacity presets, Settings, and Quit.
+  - Added "Change Task" dynamic submenu allowing instant task binding directly from the floating widget.
+  - Implemented "Hide Controls Automatically" option (`floating_auto_hide_controls`): controls and buttons smoothly hide when mouse leaves the widget and appear on hover.
+  - Enhanced compact mode transitions with unified controls container.
+
+### Git Commits
+- `feat(floating): add context menu, auto-hide controls, and task switching`
+
+### Next Planned Milestone
+- Enhance Task ↔ Pomodoro workflow with no-task prompt and reliable counter increments.
