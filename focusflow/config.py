@@ -16,14 +16,20 @@ APP_DESCRIPTION = "Native Linux Pomodoro, Todo & Productivity Tracker"
 # XDG Standard Base Directories
 XDG_CONFIG_HOME = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
 XDG_DATA_HOME = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
+XDG_STATE_HOME = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state"))
 
 APP_CONFIG_DIR = XDG_CONFIG_HOME / "focusflow"
 APP_DATA_DIR = XDG_DATA_HOME / "focusflow"
+APP_STATE_DIR = XDG_STATE_HOME / "focusflow"
+APP_BACKUP_DIR = APP_DATA_DIR / "backups"
+LOG_FILE_PATH = APP_STATE_DIR / "focusflow.log"
 
 # Ensure runtime directories exist if writable
 try:
     APP_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    APP_STATE_DIR.mkdir(parents=True, exist_ok=True)
+    APP_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 except OSError:
     pass
 

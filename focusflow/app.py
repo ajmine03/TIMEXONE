@@ -13,25 +13,26 @@ from PyQt6.QtCore import QTimer, Qt
 
 from focusflow.config import (
     APP_NAME, APP_ID, APP_VERSION, APP_DESCRIPTION,
-    DEFAULT_DB_PATH
+    DEFAULT_DB_PATH, LOG_FILE_PATH
 )
-from focusflow.db.database import Database
-from focusflow.db.repository import Repository
-from focusflow.core.timer import PomodoroEngine, TimerState
-from focusflow.core.task_manager import TaskManager
-from focusflow.core.tracker import IdleDetector
-from focusflow.core.reminders import ReminderService
-from focusflow.utils.sound import SoundPlayer
-from focusflow.utils.export_import import DataManager
-from focusflow.ui.notifications import NotificationService
-from focusflow.ui.main_window import MainWindow
-from focusflow.ui.floating_timer import FloatingTimerWidget
-from focusflow.ui.tray import SystemTrayManager
-from focusflow.ui.stats_view import StatsView
-from focusflow.ui.settings_view import SettingsView
-from focusflow.ui.wizard import FirstRunWizard
+import logging.handlers
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+# Setup persistent file logging alongside stderr
+handlers = [logging.StreamHandler(sys.stderr)]
+try:
+    LOG_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    file_handler = logging.handlers.RotatingFileHandler(
+        LOG_FILE_PATH, maxBytes=1024 * 1024 * 2, backupCount=3, encoding="utf-8"
+    )
+    handlers.append(file_handler)
+except Exception:
+    pass
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=handlers,
+)
 logger = logging.getLogger(__name__)
 
 

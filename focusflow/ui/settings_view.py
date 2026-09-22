@@ -80,11 +80,17 @@ class SettingsView(QWidget):
         # 3. Appearance Card
         self.form_layout.addWidget(self._create_appearance_section())
 
-        # 4. Productivity & Autostart Card
+        # 4. Productivity & Privacy Card
         self.form_layout.addWidget(self._create_productivity_section())
 
         # 5. Floating Timer Card
         self.form_layout.addWidget(self._create_floating_section())
+
+        # 6. Data Management & Backups Card
+        self.form_layout.addWidget(self._create_data_section())
+
+        # 7. Diagnostics & Logging Card
+        self.form_layout.addWidget(self._create_diagnostics_section())
 
         scroll.setWidget(container)
         main_layout.addWidget(scroll)
@@ -186,6 +192,20 @@ class SettingsView(QWidget):
         self.check_autostart = QCheckBox("Start FocusFlow automatically on Linux login")
         form.addRow("", self.check_autostart)
 
+        self.check_prompt_no_task = QCheckBox("Prompt to select or create a task when timer starts")
+        form.addRow("", self.check_prompt_no_task)
+
+        self.check_usage_tracking = QCheckBox("Track application usage (optional, privacy-safe)")
+        form.addRow("", self.check_usage_tracking)
+
+        privacy_note = QLabel(
+            "Privacy guarantee: FocusFlow tracks ONLY process names and durations during active sessions. "
+            "Keystrokes, passwords, screenshots, clipboard data, and browsing content are NEVER collected."
+        )
+        privacy_note.setStyleSheet("color: #6c7086; font-size: 11px;")
+        privacy_note.setWordWrap(True)
+        form.addRow("", privacy_note)
+
         layout.addLayout(form)
         return card
 
@@ -200,8 +220,157 @@ class SettingsView(QWidget):
         self.check_always_top = QCheckBox("Keep floating timer always on top of other windows")
         form.addRow("", self.check_always_top)
 
+        self.check_auto_hide_controls = QCheckBox("Hide controls automatically (show on hover)")
+        form.addRow("", self.check_auto_hide_controls)
+
         layout.addLayout(form)
         return card
+
+    def _create_data_section(self) -> QFrame:
+        card, layout = self._create_section_frame("💾 Data Management & Backups")
+        form = QFormLayout()
+        form.setSpacing(12)
+
+        row_export = QHBoxLayout()
+        btn_exp_sessions = QPushButton("Export Sessions CSV")
+        btn_exp_sessions.clicked.connect(self._export_sessions_csv)
+        row_export.addWidget(btn_exp_sessions)
+
+        btn_exp_tasks = QPushButton("Export Tasks CSV")
+        btn_exp_tasks.clicked.connect(self._export_tasks_csv)
+        row_export.addWidget(btn_exp_tasks)
+
+        btn_exp_json = QPushButton("Export JSON Backup")
+        btn_exp_json.clicked.connect(self._export_json)
+        row_export.addWidget(btn_exp_json)
+        row_export.addStretch()
+        form.addRow("Export Data:", row_export)
+
+        row_import = QHBoxLayout()
+        btn_imp_json = QPushButton("Import JSON Backup...")
+        btn_imp_json.clicked.connect(self._import_json)
+        row_import.addWidget(btn_imp_json)
+
+        btn_backup_now = QPushButton("Create Database Backup Now")
+        btn_backup_now.clicked.connect(self._backup_database_now)
+        row_import.addWidget(btn_backup_now)
+        row_import.addStretch()
+        form.addRow("Import & Backup:", row_import)
+
+        layout.addLayout(form)
+        return card
+
+    def _create_diagnostics_section(self) -> QFrame:
+        card, layout = self._create_section_frame("🔍 System Diagnostics & Logs")
+        form = QFormLayout()
+        form.setSpacing(12)
+
+        from focusflow.config import LOG_FILE_PATH
+        log_info = QLabel(f"Log file: <code>{LOG_FILE_PATH}</code>")
+        log_info.setStyleSheet("color: #a6adc8; font-size: 12px;")
+        form.addRow("", log_info)
+
+        row_log = QHBoxLayout()
+        btn_view_log = QPushButton("View Application Log")
+        btn_view_log.clicked.connect(self._view_application_log)
+        row_log.addWidget(btn_view_log)
+        row_log.addStretch()
+        form.addRow("Diagnostics:", row_log)
+
+        layout.addLayout(form)
+        return card
+
+    def _export_sessions_csv(self):
+        from PyQt6.QtWidgets import QFileDialog
+        from focusflow.utils.export_import import DataManager
+        from pathlib import Path
+        path, _ = QFileDialog.getSaveFileName(self, "Export Sessions to CSV", "focus_sessions.csv", "CSV Files (*.csv)")
+        if path:
+            dm = DataManager(self.repo)
+            cnt = dm.export_sessions_csv(Path(path))
+            QMessageBox.information(self, "Export Complete", f"Successfully exported {cnt} sessions to CSV.")
+
+    def _export_tasks_csv(self):
+        from PyQt6.QtWidgets import QFileDialog
+        from focusflow.utils.export_import import DataManager
+        from pathlib import Path
+        path, _ = QFileDialog.getSaveFileName(self, "Export Tasks to CSV", "tasks.csv", "CSV Files (*.csv)")
+        if path:
+            dm = DataManager(self.repo)
+            cnt = dm.export_tasks_csv(Path(path))
+            QMessageBox.information(self, "Export Complete", f"Successfully exported {cnt} tasks to CSV.")
+
+    def _export_json(self):
+        from PyQt6.QtWidgets import QFileDialog
+        from focusflow.utils.export_import import DataManager
+        from pathlib import Path
+        path, _ = QFileDialog.getSaveFileName(self, "Export Full JSON Backup", "focusflow_backup.json", "JSON Files (*.json)")
+        if path:
+            dm = DataManager(self.repo)
+            counts = dm.export_all_json(Path(path))
+            QMessageBox.information(self, "Export Complete", f"Exported {counts['tasks']} tasks and {counts['sessions']} sessions to JSON.")
+
+    def _import_json(self):
+        from PyQt6.QtWidgets import QFileDialog
+        from focusflow.utils.export_import import DataManager
+        from pathlib import Path
+        path, _ = QFileDialog.getOpenFileName(self, "Import JSON Backup", "", "JSON Files (*.json)")
+        if not path:
+            return
+
+        confirm = QMessageBox.question(
+            self,
+            "Confirm Import",
+            "Importing data will merge tasks and sessions into your database.\n\n"
+            "An automatic safety backup of your database will be created before proceeding.\n\n"
+            "Do you want to continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+
+        dm = DataManager(self.repo)
+        try:
+            res = dm.import_all_json(Path(path))
+            QMessageBox.information(self, "Import Complete", f"Successfully imported {res['tasks']} new tasks and {res['sessions']} new sessions.")
+        except Exception as e:
+            QMessageBox.critical(self, "Import Failed", f"Failed importing JSON file: {e}")
+
+    def _backup_database_now(self):
+        from focusflow.utils.export_import import DataManager
+        from focusflow.config import APP_BACKUP_DIR
+        dm = DataManager(self.repo)
+        backup_file = dm.create_rolling_backup(max_backups=5)
+        QMessageBox.information(self, "Backup Created", f"Safety snapshot created:\n\n{backup_file}\n\n(FocusFlow retains the latest 5 backups)")
+
+    def _view_application_log(self):
+        from focusflow.config import LOG_FILE_PATH
+        from PyQt6.QtWidgets import QDialog, QTextEdit, QVBoxLayout, QPushButton
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("FocusFlow Application Log")
+        dlg.resize(680, 480)
+        l = QVBoxLayout(dlg)
+
+        edit = QTextEdit()
+        edit.setReadOnly(True)
+        edit.setStyleSheet("font-family: monospace; font-size: 11px; background-color: #11111b; color: #cdd6f4;")
+
+        if LOG_FILE_PATH.exists():
+            try:
+                lines = LOG_FILE_PATH.read_text(encoding="utf-8").splitlines()
+                # Show last 200 lines
+                edit.setPlainText("\n".join(lines[-200:]))
+            except Exception as e:
+                edit.setPlainText(f"Error reading log file: {e}")
+        else:
+            edit.setPlainText("No log file generated yet.")
+
+        l.addWidget(edit)
+        btn_close = QPushButton("Close")
+        btn_close.clicked.connect(dlg.accept)
+        l.addWidget(btn_close)
+        dlg.exec()
 
     def load_settings(self):
         prefs = self.repo.get_all_preferences()
@@ -223,8 +392,12 @@ class SettingsView(QWidget):
         self.spin_goal.setValue(prefs.get("daily_goal_seconds", 7200) // 3600)
         self.check_autostart.setChecked(is_autostart_enabled())
 
+        self.check_prompt_no_task.setChecked(prefs.get("prompt_no_task", True))
+        self.check_usage_tracking.setChecked(prefs.get("usage_tracking_enabled", False))
+
         self.check_auto_show.setChecked(prefs.get("floating_auto_show", True))
         self.check_always_top.setChecked(prefs.get("floating_always_on_top", True))
+        self.check_auto_hide_controls.setChecked(prefs.get("floating_auto_hide_controls", False))
 
     def save_settings(self):
         focus_sec = self.spin_focus.value() * 60
@@ -256,8 +429,12 @@ class SettingsView(QWidget):
         else:
             disable_autostart()
 
+        self.repo.set_preference("prompt_no_task", self.check_prompt_no_task.isChecked())
+        self.repo.set_preference("usage_tracking_enabled", self.check_usage_tracking.isChecked())
+
         self.repo.set_preference("floating_auto_show", self.check_auto_show.isChecked())
         self.repo.set_preference("floating_always_on_top", self.check_always_top.isChecked())
+        self.repo.set_preference("floating_auto_hide_controls", self.check_auto_hide_controls.isChecked())
 
         # Propagate to engine
         self.engine.update_durations(

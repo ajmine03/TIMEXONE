@@ -70,6 +70,15 @@ class TestExportImport(unittest.TestCase):
         self.assertTrue(backup_file.exists())
         self.assertTrue(backup_file.stat().st_size > 0)
 
+    def test_rolling_database_backups(self):
+        backup_dir = Path(self.temp_dir.name) / "rolling_backups"
+        # Create 7 backups
+        for _ in range(7):
+            self.manager.create_rolling_backup(backup_dir=backup_dir, max_backups=5)
+
+        backups = list(backup_dir.glob("focusflow_backup_*.db"))
+        self.assertEqual(len(backups), 5)
+
 
 if __name__ == "__main__":
     unittest.main()

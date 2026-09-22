@@ -8,8 +8,9 @@ import json
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
+from focusflow.config import APP_BACKUP_DIR
 from focusflow.db.repository import Repository, Task, PomodoroSession
 
 
@@ -87,7 +88,13 @@ class DataManager:
         return {"tasks": len(tasks), "sessions": len(sessions)}
 
     def import_all_json(self, input_file: Path) -> Dict[str, int]:
-        """Import tasks and sessions from a FocusFlow JSON export."""
+        """Import tasks and sessions from a FocusFlow JSON export, creating an automatic backup first."""
+        # Create rolling safety backup before altering data
+        try:
+            self.create_rolling_backup()
+        except Exception:
+            pass
+
         with open(input_file, "r", encoding="utf-8") as f:
             data = json.load(f)
 
@@ -147,7 +154,31 @@ class DataManager:
     def backup_database(self, destination_dir: Path) -> Path:
         """Create a timestamped SQLite database copy."""
         destination_dir.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         target_file = destination_dir / f"focusflow_backup_{timestamp}.db"
         shutil.copy2(str(self.repo.db.db_path), str(target_file))
         return target_file
+
+    def create_rolling_backup(
+        self,
+        max_backups: int = 5,
+        destination_dir: Optional[Path] = None,
+        backup_dir: Optional[Path] = None,
+    ) -> Path:
+        """Create a backup and ensure no more than max_backups are retained."""
+        dest = backup_dir if backup_dir is not None else (destination_dir if destination_dir is not None else APP_BACKUP_DIR)
+        dest.mkdir(parents=True, exist_ok=True)
+
+        backup_file = self.backup_database(dest)
+
+        # Prune older backups
+        existing = sorted(dest.glob("focusflow_backup_*.db"), key=lambda p: p.stat().st_mtime)
+        if len(existing) > max_backups:
+            to_remove = existing[: len(existing) - max_backups]
+            for old_p in to_remove:
+                try:
+                    old_p.unlink()
+                except OSError:
+                    pass
+
+        return backup_file
