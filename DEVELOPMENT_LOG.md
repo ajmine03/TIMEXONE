@@ -536,3 +536,42 @@ This document tracks the chronological engineering progress, completed milestone
 ### Status
 - **FocusFlow v0.2.0 Released**: All 9 goals fulfilled, fully tested, and ready for daily driver use on Parrot OS / Debian.
 
+---
+
+## Milestone 24: Floating Timer Redesign, Drag Fix, Multi-Monitor Safety & Logging Silence
+
+### Date: 2026-09-22
+
+### Completed
+- **Floating Timer UI Cleanup**:
+  - Redesigned `focusflow/ui/floating_timer.py` to be smaller (175x110px), cleaner, and minimal.
+  - Placed visual focus entirely on the countdown timer (`28px` bold font) with state badge (`FOCUS`) above and active task title (`Study Linux`) below.
+  - Subdued, compact control row (`▶/⏸`, `■`, `⋮`) measuring 26x24px without visual dominance.
+  - True compact mode (`136x40px`): single horizontal pill showing `[ 24:37  ▶  ⋮ ]`.
+- **Drag Interaction Fix**:
+  - Identified root cause of unresponsiveness: child labels and nested `QFrame` consumed/intercepted mouse events on frameless windows.
+  - Implemented `DraggableFrame(QFrame)` to delegate mouse press, move, and release events directly to the floating window.
+  - Set `WA_TransparentForMouseEvents` on timer, state, and task labels so clicks/drags anywhere on text pass seamlessly through to the draggable frame.
+  - Verified buttons (`btn_play_pause`, `btn_stop`, `btn_more`) remain interactive and click without dragging.
+- **Drag Position Persistence**:
+  - Window position is saved only upon `mouseReleaseEvent` rather than continuously on move.
+  - Coordinates are stored in SQLite preferences (`floating_x`, `floating_y`) and restored on app relaunch.
+- **Multi-Monitor Safety**:
+  - Implemented `ensure_on_screen(pos, size)`: verifies widget coordinates against all active `QGuiApplication.screens()`.
+  - If saved position falls off-screen (e.g., unplugged external monitor), widget automatically falls back onto the primary screen's available geometry.
+- **Auto-Hide Controls on Hover**:
+  - When enabled, controls smoothly hide when the mouse leaves the widget and reveal on hover (`enterEvent`/`leaveEvent`).
+  - Timer, state, and task label remain permanently visible.
+- **Terminal Logging Silence**:
+  - Configured console `StreamHandler` to `logging.WARNING` level during standard GUI launches in `focusflow/app.py`.
+  - Detailed diagnostic `INFO` logs continue recording into `~/.local/state/focusflow/focusflow.log` for in-app viewer inspection.
+  - CLI control commands (`--start`, `--pause`, `--stop`) output clean single-line feedback to stdout.
+- **Testing & Verification**:
+  - Added `tests/test_floating_timer.py` covering position persistence, off-screen multi-monitor fallback, compact mode, and auto-hide controls (5 new unit tests, 30/30 tests passing).
+  - Executed GUI drag simulation verifying center drag, timer text drag, task text drag, button click isolation, and position restore across restarts.
+
+### Git Commits
+- `fix(logging): silence normal GUI stdout output`
+- `fix(floating): clean up widget and restore drag interaction`
+
+
