@@ -17,6 +17,78 @@ from focusflow.core.task_manager import TaskManager
 from focusflow.db.repository import Repository
 
 
+def configure_kwin_keep_above(enable: bool = True):
+    """
+    Configures a KDE Plasma KWin window rule to force Keep Above for the floating timer.
+    Works natively on KDE Plasma 6 Wayland and X11 to keep widget above all windows.
+    """
+    import os
+    import configparser
+    import subprocess
+    from pathlib import Path
+
+    desktop = os.environ.get("XDG_CURRENT_DESKTOP", "").upper()
+    if "KDE" not in desktop and not (Path.home() / ".config" / "kwinrc").exists():
+        return
+
+    rule_id = "focusflow-floating-above"
+    config_path = Path.home() / ".config" / "kwinrulesrc"
+
+    try:
+        config = configparser.ConfigParser(interpolation=None)
+        if config_path.exists():
+            config.read(str(config_path), encoding="utf-8")
+
+        if not config.has_section("General"):
+            config.add_section("General")
+
+        existing_rules = [r.strip() for r in config.get("General", "rules", fallback="").split(",") if r.strip()]
+
+        if enable:
+            if rule_id not in existing_rules:
+                existing_rules.append(rule_id)
+
+            if not config.has_section(rule_id):
+                config.add_section(rule_id)
+
+            config.set(rule_id, "Description", "FocusFlow Floating Timer Keep Above")
+            config.set(rule_id, "above", "true")
+            config.set(rule_id, "aboverule", "2")  # 2 = Force Keep Above
+            config.set(rule_id, "title", "FocusFlow Floating")
+            config.set(rule_id, "titlematch", "2")  # 2 = Substring match
+            config.set(rule_id, "wmclass", "focusflow")
+            config.set(rule_id, "wmclasscomplete", "false")
+            config.set(rule_id, "wmclassmatch", "2")  # 2 = Substring match
+
+            config.set("General", "rules", ",".join(existing_rules))
+            config.set("General", "count", str(len(existing_rules)))
+        else:
+            if rule_id in existing_rules:
+                existing_rules.remove(rule_id)
+                config.set("General", "rules", ",".join(existing_rules))
+                config.set("General", "count", str(len(existing_rules)))
+            if config.has_section(rule_id):
+                config.remove_section(rule_id)
+
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(config_path, "w", encoding="utf-8") as f:
+            config.write(f)
+
+        # Notify KWin to reload window rules immediately
+        for cmd in [
+            ["qdbus6", "org.kde.KWin", "/KWin", "reconfigure"],
+            ["qdbus", "org.kde.KWin", "/KWin", "reconfigure"],
+            ["dbus-send", "--session", "--dest=org.kde.KWin", "/KWin", "org.kde.KWin.reconfigure"],
+        ]:
+            try:
+                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2)
+                break
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+
 class FloatingTimerWidget(QWidget):
     """
     Clean, minimal, always-on-top draggable floating timer widget.
@@ -40,18 +112,23 @@ class FloatingTimerWidget(QWidget):
         self.task_manager = task_manager
         self.repo = repository
 
+        self.setWindowTitle("FocusFlow Floating Timer")
+        self.setObjectName("focusflow_floating")
+
         self.always_on_top = bool(self.repo.get_preference("floating_always_on_top", True))
         self.is_compact = bool(self.repo.get_preference("floating_compact", False))
         self.opacity = float(self.repo.get_preference("floating_opacity", 0.95))
         self.auto_hide_controls = bool(self.repo.get_preference("floating_auto_hide_controls", False))
 
         # Window Flags: Standard top-level Window + Frameless + Always on Top
-        # Avoid Qt.WindowType.Tool on Wayland (KDE Plasma) because KWin does not keep Tool above other windows
         flags = Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint
         if self.always_on_top:
             flags |= Qt.WindowType.WindowStaysOnTopHint
         self.setWindowFlags(flags)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+
+        if self.always_on_top:
+            configure_kwin_keep_above(True)
 
         self._dragging = False
         self._drag_start = QPoint()
@@ -336,6 +413,7 @@ class FloatingTimerWidget(QWidget):
         self.always_on_top = not self.always_on_top
         self.repo.set_preference("floating_always_on_top", self.always_on_top)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, self.always_on_top)
+        configure_kwin_keep_above(self.always_on_top)
         self.show()
         if self.always_on_top:
             self.raise_()
