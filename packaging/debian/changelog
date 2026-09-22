@@ -1,3 +1,18 @@
+focusflow (0.2.0-1) unstable; urgency=medium
+
+  * FocusFlow v0.2.0 daily-driver release:
+    - Drift-free timer engine with wall-clock sync, crash recovery, and suspend detection.
+    - Floating timer polish with right-click context menu, auto-hide controls, and task switcher.
+    - Dedicated session history view with date filtering and CSV export.
+    - Daily goal progress bar, peak productivity insights, and longest streak records.
+    - Persistent file logging to XDG state directory and in-app diagnostics log viewer.
+    - Automated rolling database backups with 5-snapshot retention.
+    - Interactive inactivity/idle recovery dialog.
+    - CLI control flags (--start, --pause, --stop, --show).
+    - GitHub Actions CI test and packaging workflows.
+
+ -- FocusFlow Contributors <focusflow@localhost>  Tue, 22 Sep 2026 10:15:00 +0000
+
 focusflow (0.1.0-1) unstable; urgency=medium
 
   * Initial release of FocusFlow:

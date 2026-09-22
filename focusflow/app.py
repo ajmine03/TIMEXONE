@@ -15,6 +15,21 @@ from focusflow.config import (
     APP_NAME, APP_ID, APP_VERSION, APP_DESCRIPTION,
     DEFAULT_DB_PATH, LOG_FILE_PATH
 )
+from focusflow.db.database import Database
+from focusflow.db.repository import Repository
+from focusflow.core.timer import PomodoroEngine, TimerState
+from focusflow.core.task_manager import TaskManager
+from focusflow.core.tracker import IdleDetector
+from focusflow.core.reminders import ReminderService
+from focusflow.utils.sound import SoundPlayer
+from focusflow.utils.export_import import DataManager
+from focusflow.ui.notifications import NotificationService
+from focusflow.ui.main_window import MainWindow
+from focusflow.ui.floating_timer import FloatingTimerWidget
+from focusflow.ui.tray import SystemTrayManager
+from focusflow.ui.stats_view import StatsView
+from focusflow.ui.settings_view import SettingsView
+from focusflow.ui.wizard import FirstRunWizard
 import logging.handlers
 
 # Setup persistent file logging alongside stderr
@@ -214,6 +229,10 @@ def main():
     parser.add_argument("--minimized", action="store_true", help="Start minimized to the system tray")
     parser.add_argument("--floating-only", action="store_true", help="Start only the floating timer widget")
     parser.add_argument("--test-mode", action="store_true", help="Run in test verification mode (skip wizard)")
+    parser.add_argument("--start", action="store_true", help="Start or resume a focus session immediately")
+    parser.add_argument("--pause", action="store_true", help="Pause the active timer session")
+    parser.add_argument("--stop", action="store_true", help="Stop the active timer session")
+    parser.add_argument("--show", action="store_true", help="Open and raise the main application window")
     parser.add_argument("--db-path", type=str, default=None, help="Custom SQLite database file path")
     args = parser.parse_args()
 
@@ -234,6 +253,19 @@ def main():
         return 0
 
     focusflow_app.run(start_minimized=args.minimized, floating_only=args.floating_only)
+
+    if args.start:
+        focusflow_app.engine.start()
+    elif args.pause:
+        focusflow_app.engine.pause()
+    elif args.stop:
+        focusflow_app.engine.stop()
+
+    if args.show:
+        focusflow_app.main_window.show()
+        focusflow_app.main_window.raise_()
+        focusflow_app.main_window.activateWindow()
+
     return app.exec()
 
 

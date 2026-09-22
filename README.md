@@ -119,7 +119,7 @@ TIMEXONE/
    ```
 2. Install the generated `.deb` package:
    ```bash
-   sudo dpkg -i packaging/dist/focusflow_0.1.0-1_all.deb
+   sudo dpkg -i packaging/dist/focusflow_0.2.0-1_all.deb
    ```
 3. If missing dependencies:
    ```bash
@@ -148,9 +148,14 @@ cd TIMEXONE
 python3 run.py
 ```
 
-Optional CLI flags:
+CLI flags:
 ```bash
 python3 run.py --help
+python3 run.py --version         # Print version
+python3 run.py --start           # Start/resume focus timer immediately
+python3 run.py --pause           # Pause running timer
+python3 run.py --stop            # Stop active timer
+python3 run.py --show            # Open and raise main window
 python3 run.py --minimized       # Start minimized to tray
 python3 run.py --floating-only  # Start only the floating widget
 python3 run.py --test-mode      # Headless sanity verification
@@ -166,13 +171,15 @@ Run the automated test suite:
 python3 -m unittest discover -s tests -v
 ```
 
-All 19 tests cover:
+All 25 unit tests cover:
 - Database migrations, transactions, and integrity recovery
 - Task CRUD, completion toggling, tag indexing, and filtered queries
 - Pomodoro timer state machine, break cycling, and drift-free monotonic clock math
+- Wall-clock synchronization, suspend/sleep resilience, and crash/restart state recovery
 - Productivity statistics rollups, missing date zero-filling, and time distribution
-- Idle detection threshold handling
-- CSV and JSON export and import serialization round-trips
+- Idle detection threshold handling and interactive return-from-idle signal emission
+- CSV and JSON export/import serialization round-trips
+- Rolling database backups with 5-snapshot pruning
 
 ---
 

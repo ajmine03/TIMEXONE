@@ -462,3 +462,77 @@ This document tracks the chronological engineering progress, completed milestone
 
 ### Next Planned Milestone
 - Implement Error Logging, Diagnostics Viewer & Rolling Database Backups (`focusflow/config.py`, `focusflow/utils/export_import.py`, `focusflow/ui/settings_view.py`).
+
+---
+
+## Milestone 21: Error Logging, Diagnostics Viewer & Rolling Database Backups
+
+### Date: 2026-09-22
+
+### Completed
+- Configured persistent file logging in `focusflow/config.py` and `focusflow/app.py`:
+  - `RotatingFileHandler` writing to `~/.local/state/focusflow/focusflow.log` (2MB max size with 3 backups).
+- Implemented `LogViewerDialog` in `focusflow/ui/settings_view.py`:
+  - Allows users to inspect recent application logs directly within the Settings interface.
+- Implemented rolling database snapshots in `focusflow/utils/export_import.py`:
+  - `create_rolling_backup(max_backups=5)` creates timestamped snapshots in `~/.local/share/focusflow/backups/` and automatically prunes older backups so at most 5 are retained.
+  - Automatic safety snapshot created prior to any JSON backup import.
+- Added test in `tests/test_export_import.py` verifying rolling backup creation and pruning.
+
+### Git Commits
+- `feat(system): add persistent file logging, diagnostics viewer, and rolling backups`
+
+### Next Planned Milestone
+- Implement Inactivity / Idle Return Dialog and Privacy Settings (`focusflow/core/tracker.py`, `focusflow/ui/components/idle_dialog.py`).
+
+---
+
+## Milestone 22: Interactive Inactivity Return Dialog & Privacy Settings
+
+### Date: 2026-09-22
+
+### Completed
+- Implemented `focusflow/ui/components/idle_dialog.py`:
+  - `IdleReturnDialog` modal prompting the user when returning from system inactivity.
+  - Options to keep inactive time as focus, discard inactive time and pause, discard inactive time and resume, or discard the Pomodoro session.
+- Enhanced `focusflow/core/tracker.py`:
+  - Added `returned_from_idle` signal to `IdleDetector` tracking when user returns after inactivity.
+  - Non-invasive detection via `libXss` and DBus ScreenSaver.
+- Added `adjust_remaining_time()` method to `PomodoroEngine` in `focusflow/core/timer.py`.
+- Added unit test in `tests/test_idle_detector.py` validating idle return signal emission.
+
+### Git Commits
+- `feat(idle): add interactive idle recovery dialog and privacy settings`
+
+### Next Planned Milestone
+- Implement CLI flags, version bump to 0.2.0, Debian package rebuild, and release verification.
+
+---
+
+## Milestone 23: CLI Control Flags, Version 0.2.0 Bump & Release Verification
+
+### Date: 2026-09-22
+
+### Completed
+- Implemented CLI control flags in `focusflow/app.py`:
+  - `--start`: Start or resume focus session immediately.
+  - `--pause`: Pause running session.
+  - `--stop`: Stop active session.
+  - `--show`: Raise and focus main application window.
+  - `--version`, `--minimized`, `--floating-only`, `--test-mode`.
+- Version bump to `0.2.0` across:
+  - `focusflow/config.py` (`APP_VERSION = "0.2.0"`)
+  - `setup.py` (`version="0.2.0"`)
+  - `packaging/debian/control` (`Version: 0.2.0-1`)
+  - `packaging/debian/changelog` (`focusflow (0.2.0-1)`)
+  - `packaging/build_deb.sh` (`VERSION="0.2.0"`)
+- Rebuilt Debian package `packaging/dist/focusflow_0.2.0-1_all.deb` and verified contents.
+- Ran all 25 automated unit tests (25/25 passing).
+- Verified headless test mode execution (`--test-mode`).
+
+### Git Commits
+- `release: v0.2.0 — daily-driver hardening, session history, and CI workflows`
+
+### Status
+- **FocusFlow v0.2.0 Released**: All 9 goals fulfilled, fully tested, and ready for daily driver use on Parrot OS / Debian.
+

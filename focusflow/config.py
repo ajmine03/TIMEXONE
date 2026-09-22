@@ -10,7 +10,7 @@ import sys
 # Application Metadata
 APP_NAME = "FocusFlow"
 APP_ID = "org.focusflow.FocusFlow"
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.2.0"
 APP_DESCRIPTION = "Native Linux Pomodoro, Todo & Productivity Tracker"
 
 # XDG Standard Base Directories

@@ -5,7 +5,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-VERSION="0.1.0"
+VERSION="0.2.0"
 PKG_NAME="focusflow"
 PKG_FULL="${PKG_NAME}_${VERSION}-1_all"
 DIST_DIR="${ROOT_DIR}/packaging/dist"
