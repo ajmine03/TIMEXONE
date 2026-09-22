@@ -98,3 +98,29 @@ This document tracks the chronological engineering progress, completed milestone
 
 ### Next Planned Milestone
 - Implement Linux Desktop Notifications, Audio Chime Player, and System Tray (`focusflow/ui/notifications.py`, `focusflow/utils/sound.py`, `focusflow/ui/tray.py`).
+
+---
+
+## Milestone 5: Desktop Notifications, Audio Chime & System Tray
+
+### Date: 2026-09-22
+
+### Completed
+- Implemented `focusflow/utils/sound.py`:
+  - Multi-backend non-blocking sound player with automatic detection of `pw-play` (PipeWire), `paplay` (PulseAudio), and `aplay` (ALSA).
+  - Background worker thread to prevent UI micro-stutters during sound playback.
+- Implemented `focusflow/ui/notifications.py`:
+  - DBus native integration via `org.freedesktop.Notifications`.
+  - Seamless fallback to `notify-send` with custom application icon and urgency levels.
+  - Predefined notification triggers: Pomodoro complete, Break started, Break finished, and Daily goal reached.
+- Implemented `focusflow/ui/tray.py`:
+  - `QSystemTrayIcon` integrated with desktop environments (Plasma, GNOME, XFCE).
+  - Dynamic context menu displaying active task, live countdown timer, and session state.
+  - Interactive controls: Start/Pause/Resume, Stop, Toggle Floating Timer, Open Dashboard, Settings, and Quit.
+- Verified offscreen instantiation and signal routing.
+
+### Git Commits
+- `feat(tray): implement system tray integration, audio alerts, and desktop notifications`
+
+### Next Planned Milestone
+- Implement Modern Linux Desktop UI, Styles, and Productivity Dashboard (`focusflow/ui/`).
