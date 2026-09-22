@@ -338,3 +338,27 @@ This document tracks the chronological engineering progress, completed milestone
 
 ### Status
 - **MVP Complete & Verified**: FocusFlow is ready for local production use and Debian/Parrot/Ubuntu deployment.
+
+---
+
+# FocusFlow v0.2.0: Daily-Driver Hardening
+
+## Milestone 15: GitHub Actions CI Workflows
+
+### Date: 2026-09-22
+
+### Completed
+- Implemented `.github/workflows/tests.yml`:
+  - Multi-version matrix test workflow (Python 3.10, 3.11, 3.12, 3.13).
+  - Installs system GUI/X11 and DBus libraries.
+  - Executes unit test discovery in headless `offscreen` mode.
+  - Executes `--test-mode` application initialization sanity test.
+- Implemented `.github/workflows/build.yml`:
+  - Automated Debian `.deb` package build verification.
+  - Validates package metadata and debian file layout via `dpkg-deb`.
+
+### Git Commits
+- `ci: add GitHub Actions test and Debian build workflows`
+
+### Next Planned Milestone
+- Audit and harden Pomodoro timer engine with active state recovery, sleep/suspend detection, and pause isolation.
