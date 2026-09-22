@@ -1,23 +1,67 @@
 """
 Always-on-top Floating Timer Widget for FocusFlow.
-Features drag-to-move, compact mode toggle, opacity adjustment, and live controls.
+Minimal, distraction-free desktop utility with reliable dragging,
+multi-monitor safety, compact mode, and context menu.
 """
 
 from typing import Optional
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QFrame, QSlider, QMenu
+    QFrame, QMenu
 )
-from PyQt6.QtGui import QMouseEvent, QAction, QFont, QColor
-from PyQt6.QtCore import Qt, QPoint, pyqtSignal
+from PyQt6.QtGui import QMouseEvent, QAction, QGuiApplication
+from PyQt6.QtCore import Qt, QPoint, QSize, QRect, pyqtSignal
 
 from focusflow.core.timer import PomodoroEngine, TimerState
 from focusflow.core.task_manager import TaskManager
 from focusflow.db.repository import Repository
 
 
+class DraggableFrame(QFrame):
+    """
+    Framed container that captures left-mouse drag events
+    and moves the parent window smoothly.
+    """
+
+    def __init__(self, parent_widget: "FloatingTimerWidget"):
+        super().__init__(parent_widget)
+        self.widget = parent_widget
+        self._dragging = False
+        self._drag_start = QPoint()
+
+    def mousePressEvent(self, event: QMouseEvent):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._dragging = True
+            self._drag_start = event.globalPosition().toPoint() - self.widget.pos()
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QMouseEvent):
+        if self._dragging and (event.buttons() & Qt.MouseButton.LeftButton):
+            self.widget.move(event.globalPosition().toPoint() - self._drag_start)
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        if self._dragging:
+            self._dragging = False
+            self.widget.save_position()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+    def contextMenuEvent(self, event):
+        self.widget.open_context_menu(event.globalPos())
+        event.accept()
+
+
 class FloatingTimerWidget(QWidget):
-    """Minimal, borderless, always-on-top draggable timer widget."""
+    """
+    Clean, minimal, always-on-top draggable floating timer widget.
+    Focus is on the timer with minimal visual clutter.
+    """
 
     visibility_changed = pyqtSignal(bool)
     open_dashboard_requested = pyqtSignal()
@@ -44,9 +88,11 @@ class FloatingTimerWidget(QWidget):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
 
-        self._drag_pos = QPoint()
-        self.is_compact = False
-        self.opacity = 0.95
+        self._dragging = False
+        self._drag_start = QPoint()
+
+        self.is_compact = bool(self.repo.get_preference("floating_compact", False))
+        self.opacity = float(self.repo.get_preference("floating_opacity", 0.95))
         self.auto_hide_controls = bool(self.repo.get_preference("floating_auto_hide_controls", False))
 
         self._init_ui()
@@ -56,207 +102,327 @@ class FloatingTimerWidget(QWidget):
 
     def _init_ui(self):
         root_layout = QVBoxLayout(self)
-        root_layout.setContentsMargins(6, 6, 6, 6)
+        root_layout.setContentsMargins(4, 4, 4, 4)
 
-        # Outer rounded frame with dark styling
-        self.frame = QFrame()
-        self.frame.setObjectName("FloatingFrame")
+        # Draggable card frame
+        self.frame = DraggableFrame(self)
+        self.frame.setObjectName("FloatingCard")
         self.frame.setStyleSheet("""
-            QFrame#FloatingFrame {
-                background-color: rgba(24, 24, 37, 240);
-                border: 1px solid #45475a;
-                border-radius: 14px;
+            QFrame#FloatingCard {
+                background-color: rgba(22, 22, 32, 240);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 12px;
             }
             QPushButton {
                 background-color: #313244;
                 color: #cdd6f4;
                 border: 1px solid #45475a;
-                border-radius: 6px;
-                padding: 4px 8px;
+                border-radius: 5px;
                 font-size: 11px;
                 font-weight: bold;
+                padding: 2px 4px;
             }
             QPushButton:hover {
                 background-color: #45475a;
                 color: #ffffff;
             }
-            QPushButton#CloseBtn {
-                border: none;
-                background: transparent;
-                color: #6c7086;
-                font-size: 13px;
-                font-weight: bold;
-            }
-            QPushButton#CloseBtn:hover {
-                color: #ef4444;
-            }
         """)
 
-        self.card_layout = QVBoxLayout(self.frame)
-        self.card_layout.setContentsMargins(12, 10, 12, 10)
-        self.card_layout.setSpacing(6)
+        card_layout = QVBoxLayout(self.frame)
+        card_layout.setContentsMargins(10, 8, 10, 8)
+        card_layout.setSpacing(4)
 
-        # 1. Top Header Row (Status dot + State label + Compact Toggle + Close)
-        self.header_row = QHBoxLayout()
-        self.header_row.setSpacing(6)
+        # ---------------------------------------------------------------------
+        # 1. Normal Mode Container
+        # ---------------------------------------------------------------------
+        self.normal_box = QWidget()
+        self.normal_layout = QVBoxLayout(self.normal_box)
+        self.normal_layout.setContentsMargins(0, 0, 0, 0)
+        self.normal_layout.setSpacing(3)
+        self.normal_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.status_dot = QLabel("●")
-        self.status_dot.setStyleSheet("color: #06b6d4; font-size: 12px;")
-        self.header_row.addWidget(self.status_dot)
-
+        # State label (e.g. FOCUS, SHORT BREAK, PAUSED)
         self.state_label = QLabel("FOCUS")
-        self.state_label.setStyleSheet("color: #a6adc8; font-size: 10px; font-weight: bold; letter-spacing: 1px;")
-        self.header_row.addWidget(self.state_label)
+        self.state_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.state_label.setStyleSheet("color: #06b6d4; font-size: 10px; font-weight: bold; letter-spacing: 1.5px;")
+        self.state_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.normal_layout.addWidget(self.state_label)
 
-        self.header_row.addStretch()
-
-        self.btn_compact_toggle = QPushButton("⛶")
-        self.btn_compact_toggle.setToolTip("Toggle Compact Mode")
-        self.btn_compact_toggle.setFixedSize(22, 22)
-        self.btn_compact_toggle.clicked.connect(self.toggle_compact_mode)
-        self.header_row.addWidget(self.btn_compact_toggle)
-
-        self.btn_close = QPushButton("✕")
-        self.btn_close.setObjectName("CloseBtn")
-        self.btn_close.setToolTip("Hide Floating Timer")
-        self.btn_close.setFixedSize(22, 22)
-        self.btn_close.clicked.connect(self.hide)
-        self.header_row.addWidget(self.btn_close)
-
-        self.card_layout.addLayout(self.header_row)
-
-        # 2. Digital Countdown Timer
+        # Timer label (Big, bold, clean)
         self.time_label = QLabel("25:00")
         self.time_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.time_label.setStyleSheet("color: #ffffff; font-size: 26px; font-weight: bold; font-family: 'Inter', sans-serif;")
-        self.card_layout.addWidget(self.time_label)
+        self.time_label.setStyleSheet("color: #ffffff; font-size: 28px; font-weight: bold; font-family: 'Inter', 'Noto Sans', sans-serif;")
+        self.time_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.normal_layout.addWidget(self.time_label)
 
-        # 3. Active Task Title
-        self.task_label = QLabel("Ready to Focus")
+        # Task title (Subtle)
+        self.task_label = QLabel("General Focus")
         self.task_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.task_label.setStyleSheet("color: #9399b2; font-size: 11px;")
-        self.card_layout.addWidget(self.task_label)
+        self.task_label.setStyleSheet("color: #a6adc8; font-size: 11px;")
+        self.task_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.normal_layout.addWidget(self.task_label)
 
-        # 4. Control Buttons Row (Play/Pause, Stop, Dashboard)
-        self.controls_container = QWidget()
-        self.controls_row = QHBoxLayout(self.controls_container)
-        self.controls_row.setContentsMargins(0, 0, 0, 0)
-        self.controls_row.setSpacing(6)
-        self.controls_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # Controls row (Play/Pause, Stop, Options menu)
+        self.controls_row_widget = QWidget()
+        controls_row = QHBoxLayout(self.controls_row_widget)
+        controls_row.setContentsMargins(0, 2, 0, 0)
+        controls_row.setSpacing(6)
+        controls_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.btn_play_pause = QPushButton("▶")
-        self.btn_play_pause.setFixedSize(32, 28)
+        self.btn_play_pause.setFixedSize(28, 24)
         self.btn_play_pause.setToolTip("Start / Pause Timer")
         self.btn_play_pause.clicked.connect(self.engine.toggle_play_pause)
-        self.controls_row.addWidget(self.btn_play_pause)
+        controls_row.addWidget(self.btn_play_pause)
 
         self.btn_stop = QPushButton("■")
-        self.btn_stop.setFixedSize(32, 28)
+        self.btn_stop.setFixedSize(28, 24)
         self.btn_stop.setToolTip("Stop Timer")
         self.btn_stop.clicked.connect(self.engine.stop)
-        self.controls_row.addWidget(self.btn_stop)
+        controls_row.addWidget(self.btn_stop)
 
         self.btn_more = QPushButton("⋮")
-        self.btn_more.setFixedSize(28, 28)
-        self.btn_more.setToolTip("Options")
-        self.btn_more.clicked.connect(self._show_options_menu)
-        self.controls_row.addWidget(self.btn_more)
+        self.btn_more.setFixedSize(24, 24)
+        self.btn_more.setToolTip("Options (Right-click also opens menu)")
+        self.btn_more.clicked.connect(self._show_options_from_btn)
+        controls_row.addWidget(self.btn_more)
 
-        self.card_layout.addWidget(self.controls_container)
+        self.normal_layout.addWidget(self.controls_row_widget)
+        card_layout.addWidget(self.normal_box)
 
-        if self.auto_hide_controls:
-            self.controls_container.hide()
-            self.btn_compact_toggle.hide()
-            self.btn_close.hide()
+        # ---------------------------------------------------------------------
+        # 2. Compact Mode Container: [ 24:37  ▶  ⋮ ]
+        # ---------------------------------------------------------------------
+        self.compact_box = QWidget()
+        compact_layout = QHBoxLayout(self.compact_box)
+        compact_layout.setContentsMargins(2, 0, 2, 0)
+        compact_layout.setSpacing(6)
+        compact_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.compact_time_label = QLabel("25:00")
+        self.compact_time_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.compact_time_label.setStyleSheet("color: #ffffff; font-size: 18px; font-weight: bold;")
+        self.compact_time_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        compact_layout.addWidget(self.compact_time_label)
+
+        self.compact_btn_play_pause = QPushButton("▶")
+        self.compact_btn_play_pause.setFixedSize(26, 22)
+        self.compact_btn_play_pause.clicked.connect(self.engine.toggle_play_pause)
+        compact_layout.addWidget(self.compact_btn_play_pause)
+
+        self.compact_btn_more = QPushButton("⋮")
+        self.compact_btn_more.setFixedSize(22, 22)
+        self.compact_btn_more.clicked.connect(self._show_options_from_compact_btn)
+        compact_layout.addWidget(self.compact_btn_more)
+
+        card_layout.addWidget(self.compact_box)
 
         root_layout.addWidget(self.frame)
-        self.resize(220, 140)
+
+        # Apply initial mode
+        if self.is_compact:
+            self.normal_box.hide()
+            self.compact_box.show()
+            self.resize(136, 40)
+        else:
+            self.compact_box.hide()
+            self.normal_box.show()
+            if self.auto_hide_controls:
+                self.controls_row_widget.hide()
+                self.resize(175, 84)
+            else:
+                self.resize(175, 110)
 
     def _connect_signals(self):
         self.engine.subscribe_tick(self._on_tick)
         self.engine.subscribe_state_changed(self._on_state_changed)
 
+    # -------------------------------------------------------------------------
+    # Drag and Multi-Monitor Geometry Logic
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def ensure_on_screen(pos: QPoint, size: QSize) -> QPoint:
+        """
+        Verify that pos is within the visible bounds of at least one connected screen.
+        If off-screen or monitor was unplugged, reposition onto primary screen.
+        """
+        screens = QGuiApplication.screens()
+        if not screens:
+            return pos
+
+        widget_rect = QRect(pos, size)
+
+        # Check if widget intersects any available screen geometry with >= 20px overlap
+        for screen in screens:
+            avail = screen.availableGeometry()
+            intersection = avail.intersected(widget_rect)
+            if intersection.width() >= 20 and intersection.height() >= 20:
+                return pos
+
+        # Fallback to primary screen
+        primary = QGuiApplication.primaryScreen() or screens[0]
+        avail = primary.availableGeometry()
+        safe_x = avail.x() + avail.width() - size.width() - 32
+        safe_y = avail.y() + 48
+        return QPoint(safe_x, safe_y)
+
     def _load_saved_geometry(self):
-        saved_x = self.repo.get_preference("floating_x", 120)
-        saved_y = self.repo.get_preference("floating_y", 120)
+        saved_x = int(self.repo.get_preference("floating_x", 120))
+        saved_y = int(self.repo.get_preference("floating_y", 120))
         self.opacity = float(self.repo.get_preference("floating_opacity", 0.95))
         self.setWindowOpacity(self.opacity)
-        self.move(int(saved_x), int(saved_y))
 
-    def _save_geometry(self):
+        safe_pos = self.ensure_on_screen(QPoint(saved_x, saved_y), self.size())
+        self.move(safe_pos)
+
+    def save_position(self):
+        """Save current widget coordinates to preferences."""
         self.repo.set_preference("floating_x", self.x())
         self.repo.set_preference("floating_y", self.y())
 
+    # Fallback drag handling on the root widget itself
+    def mousePressEvent(self, event: QMouseEvent):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._dragging = True
+            self._drag_start = event.globalPosition().toPoint() - self.pos()
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QMouseEvent):
+        if self._dragging and (event.buttons() & Qt.MouseButton.LeftButton):
+            self.move(event.globalPosition().toPoint() - self._drag_start)
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        if self._dragging:
+            self._dragging = False
+            self.save_position()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+    # -------------------------------------------------------------------------
+    # Auto-Hide Controls on Hover
+    # -------------------------------------------------------------------------
+    def enterEvent(self, event):
+        super().enterEvent(event)
+        if self.auto_hide_controls and not self.is_compact:
+            self.controls_row_widget.show()
+            self.resize(175, 110)
+
+    def leaveEvent(self, event):
+        super().leaveEvent(event)
+        if self.auto_hide_controls and not self.is_compact:
+            self.controls_row_widget.hide()
+            self.resize(175, 84)
+
+    # -------------------------------------------------------------------------
+    # Mode & Opacity Toggles
+    # -------------------------------------------------------------------------
     def toggle_compact_mode(self):
         self.is_compact = not self.is_compact
+        self.repo.set_preference("floating_compact", self.is_compact)
         if self.is_compact:
-            self.task_label.hide()
-            self.controls_container.hide()
-            self.state_label.hide()
-            self.time_label.setStyleSheet("color: #ffffff; font-size: 20px; font-weight: bold;")
-            self.resize(150, 68)
+            self.normal_box.hide()
+            self.compact_box.show()
+            self.resize(136, 40)
         else:
-            self.task_label.show()
-            self.state_label.show()
-            self.time_label.setStyleSheet("color: #ffffff; font-size: 26px; font-weight: bold;")
-            if not self.auto_hide_controls:
-                self.controls_container.show()
-                self.btn_compact_toggle.show()
-                self.btn_close.show()
-            self.resize(220, 140)
+            self.compact_box.hide()
+            self.normal_box.show()
+            if self.auto_hide_controls:
+                self.controls_row_widget.hide()
+                self.resize(175, 84)
+            else:
+                self.controls_row_widget.show()
+                self.resize(175, 110)
 
+    def toggle_auto_hide_controls(self):
+        self.auto_hide_controls = not self.auto_hide_controls
+        self.repo.set_preference("floating_auto_hide_controls", self.auto_hide_controls)
+        if not self.is_compact:
+            if self.auto_hide_controls:
+                self.controls_row_widget.hide()
+                self.resize(175, 84)
+            else:
+                self.controls_row_widget.show()
+                self.resize(175, 110)
+
+    def set_opacity(self, value: float):
+        self.opacity = value
+        self.setWindowOpacity(value)
+        self.repo.set_preference("floating_opacity", value)
+
+    # -------------------------------------------------------------------------
+    # Timer Event Observers
+    # -------------------------------------------------------------------------
     def _on_tick(self, remaining: int, total: int, fraction: float):
         self._update_display(remaining)
 
     def _update_display(self, remaining: int):
         mins, secs = divmod(max(0, remaining), 60)
-        self.time_label.setText(f"{mins:02d}:{secs:02d}")
+        time_text = f"{mins:02d}:{secs:02d}"
+        self.time_label.setText(time_text)
+        self.compact_time_label.setText(time_text)
 
-        task_title = "Ready to Focus"
+        task_title = "General Focus"
         if self.engine.active_task_id:
             task = self.task_manager.get(self.engine.active_task_id)
             if task:
                 task_title = task.title
-        if len(task_title) > 22:
-            task_title = task_title[:19] + "..."
+        if len(task_title) > 20:
+            task_title = task_title[:17] + "..."
         self.task_label.setText(task_title)
 
     def _on_state_changed(self, new_state: TimerState):
         if new_state.is_paused:
-            self.status_dot.setStyleSheet("color: #f59e0b; font-size: 12px;")
             self.state_label.setText("PAUSED")
+            self.state_label.setStyleSheet("color: #f59e0b; font-size: 10px; font-weight: bold; letter-spacing: 1.5px;")
             self.btn_play_pause.setText("▶")
+            self.compact_btn_play_pause.setText("▶")
         elif new_state in (TimerState.RUNNING_SHORT_BREAK, TimerState.PAUSED_SHORT_BREAK):
-            self.status_dot.setStyleSheet("color: #10b981; font-size: 12px;")
-            self.state_label.setText("BREAK")
+            self.state_label.setText("SHORT BREAK")
+            self.state_label.setStyleSheet("color: #10b981; font-size: 10px; font-weight: bold; letter-spacing: 1.5px;")
             self.btn_play_pause.setText("⏸")
+            self.compact_btn_play_pause.setText("⏸")
         elif new_state in (TimerState.RUNNING_LONG_BREAK, TimerState.PAUSED_LONG_BREAK):
-            self.status_dot.setStyleSheet("color: #8b5cf6; font-size: 12px;")
             self.state_label.setText("LONG BREAK")
+            self.state_label.setStyleSheet("color: #8b5cf6; font-size: 10px; font-weight: bold; letter-spacing: 1.5px;")
             self.btn_play_pause.setText("⏸")
+            self.compact_btn_play_pause.setText("⏸")
         elif new_state == TimerState.RUNNING_FOCUS:
-            self.status_dot.setStyleSheet("color: #06b6d4; font-size: 12px;")
             self.state_label.setText("FOCUS")
+            self.state_label.setStyleSheet("color: #06b6d4; font-size: 10px; font-weight: bold; letter-spacing: 1.5px;")
             self.btn_play_pause.setText("⏸")
-        else: # IDLE
-            self.status_dot.setStyleSheet("color: #64748b; font-size: 12px;")
+            self.compact_btn_play_pause.setText("⏸")
+        else:  # IDLE
             self.state_label.setText("IDLE")
+            self.state_label.setStyleSheet("color: #64748b; font-size: 10px; font-weight: bold; letter-spacing: 1.5px;")
             self.btn_play_pause.setText("▶")
+            self.compact_btn_play_pause.setText("▶")
 
         self._update_display(self.engine.remaining_seconds)
 
-    def _show_options_menu(self):
-        self._open_context_menu(self.btn_more.mapToGlobal(QPoint(0, self.btn_more.height())))
+    # -------------------------------------------------------------------------
+    # Context Menu
+    # -------------------------------------------------------------------------
+    def _show_options_from_btn(self):
+        self.open_context_menu(self.btn_more.mapToGlobal(QPoint(0, self.btn_more.height())))
+
+    def _show_options_from_compact_btn(self):
+        self.open_context_menu(self.compact_btn_more.mapToGlobal(QPoint(0, self.compact_btn_more.height())))
 
     def contextMenuEvent(self, event):
-        self._open_context_menu(event.globalPos())
+        self.open_context_menu(event.globalPos())
         event.accept()
 
-    def _open_context_menu(self, global_pos: QPoint):
+    def open_context_menu(self, global_pos: QPoint):
         menu = QMenu(self)
 
         # Title
-        title_act = QAction("<b>FocusFlow</b>", self)
+        title_act = QAction("FocusFlow", self)
         title_act.setEnabled(False)
         menu.addAction(title_act)
         menu.addSeparator()
@@ -286,11 +452,6 @@ class FloatingTimerWidget(QWidget):
 
         menu.addSeparator()
 
-        # Navigation & Tasks
-        act_dash = QAction("Show Dashboard", self)
-        act_dash.triggered.connect(self.open_dashboard_requested.emit)
-        menu.addAction(act_dash)
-
         # Change Task Submenu
         task_menu = menu.addMenu("Change Task")
         act_no_task = QAction("None (General Focus)", self)
@@ -307,7 +468,7 @@ class FloatingTimerWidget(QWidget):
 
         menu.addSeparator()
 
-        # Appearance & Modes
+        # Modes & Appearance
         act_compact = QAction("Compact Mode", self)
         act_compact.setCheckable(True)
         act_compact.setChecked(self.is_compact)
@@ -320,7 +481,6 @@ class FloatingTimerWidget(QWidget):
         act_autohide.triggered.connect(self.toggle_auto_hide_controls)
         menu.addAction(act_autohide)
 
-        # Opacity Submenu
         op_menu = menu.addMenu("Opacity")
         for val, label in [(1.0, "100%"), (0.85, "85%"), (0.70, "70%"), (0.50, "50%")]:
             op_act = QAction(label, self)
@@ -331,64 +491,22 @@ class FloatingTimerWidget(QWidget):
 
         menu.addSeparator()
 
-        # Settings & Quit
+        # Navigation & System
+        act_dash = QAction("Show Dashboard", self)
+        act_dash.triggered.connect(self.open_dashboard_requested.emit)
+        menu.addAction(act_dash)
+
         act_settings = QAction("Settings", self)
         act_settings.triggered.connect(self.open_settings_requested.emit)
         menu.addAction(act_settings)
+
+        menu.addSeparator()
 
         act_quit = QAction("Quit", self)
         act_quit.triggered.connect(self.quit_requested.emit)
         menu.addAction(act_quit)
 
         menu.exec(global_pos)
-
-    def toggle_auto_hide_controls(self):
-        self.auto_hide_controls = not self.auto_hide_controls
-        self.repo.set_preference("floating_auto_hide_controls", self.auto_hide_controls)
-        if self.auto_hide_controls and not self.is_compact:
-            self.controls_container.hide()
-            self.btn_compact_toggle.hide()
-            self.btn_close.hide()
-        else:
-            self.controls_container.show()
-            self.btn_compact_toggle.show()
-            self.btn_close.show()
-
-    def enterEvent(self, event):
-        super().enterEvent(event)
-        if self.auto_hide_controls and not self.is_compact:
-            self.controls_container.show()
-            self.btn_compact_toggle.show()
-            self.btn_close.show()
-
-    def leaveEvent(self, event):
-        super().leaveEvent(event)
-        if self.auto_hide_controls and not self.is_compact:
-            self.controls_container.hide()
-            self.btn_compact_toggle.hide()
-            self.btn_close.hide()
-
-    def set_opacity(self, value: float):
-        self.opacity = value
-        self.setWindowOpacity(value)
-        self.repo.set_preference("floating_opacity", value)
-
-    # -------------------------------------------------------------------------
-    # Drag-to-Move Window Event Handlers
-    # -------------------------------------------------------------------------
-    def mousePressEvent(self, event: QMouseEvent):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
-            event.accept()
-
-    def mouseMoveEvent(self, event: QMouseEvent):
-        if event.buttons() == Qt.MouseButton.LeftButton:
-            self.move(event.globalPosition().toPoint() - self._drag_pos)
-            event.accept()
-
-    def mouseReleaseEvent(self, event: QMouseEvent):
-        self._save_geometry()
-        event.accept()
 
     def showEvent(self, event):
         super().showEvent(event)
