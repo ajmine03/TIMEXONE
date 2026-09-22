@@ -267,3 +267,26 @@ This document tracks the chronological engineering progress, completed milestone
 
 ### Next Planned Milestone
 - Implement Main Application Orchestrator and Comprehensive Verification (`focusflow/app.py`, `run.py`).
+
+---
+
+## Milestone 12: Main Application Orchestrator & Multi-Window Coordination
+
+### Date: 2026-09-22
+
+### Completed
+- Implemented `focusflow/app.py`:
+  - Centralized application coordinator tying database, domain engines, desktop views, floating widget, tray, sound player, and notifications.
+  - Heartbeat timer (1000ms QTimer) driving drift-free timer engine ticks, inactivity checks, and daily goal reminders.
+  - Signal wiring between main window, floating timer, system tray, and notification dispatcher.
+  - First-run wizard trigger for initial launches.
+  - Command-line arguments: `--version`, `--minimized`, `--floating-only`, `--test-mode`, `--db-path`.
+- Implemented `run.py`: executable CLI launcher.
+- Implemented `setup.py`: standard Python package distribution configuration.
+- Executed comprehensive unit test suite: 19/19 tests passing across database, tasks, timer drift, statistics, idle detector, and export/import.
+
+### Git Commits
+- `feat(app): implement application orchestrator, launcher, and full signal wiring`
+
+### Next Planned Milestone
+- Implement Debian Packaging (.deb) and Desktop Integration (`packaging/debian/`, `build_deb.sh`).
