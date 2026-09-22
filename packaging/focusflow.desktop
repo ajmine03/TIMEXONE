@@ -1,0 +1,23 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=FocusFlow
+GenericName=Productivity Tracker
+Comment=Native Linux Pomodoro Timer, Task Management & Productivity Tracker
+Exec=focusflow %U
+Icon=focusflow
+Terminal=false
+Categories=Utility;Clock;Office;ProjectManagement;
+Keywords=pomodoro;timer;todo;tasks;productivity;focus;tracker;
+StartupNotify=true
+StartupWMClass=FocusFlow
+X-GNOME-UsesNotifications=true
+Actions=Floating;Start;
+
+[Desktop Action Floating]
+Name=Floating Timer Only
+Exec=focusflow --floating-only
+
+[Desktop Action Start]
+Name=Start Minimized
+Exec=focusflow --minimized

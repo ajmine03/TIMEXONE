@@ -1,0 +1,20 @@
+Package: focusflow
+Version: 0.1.0-1
+Section: utils
+Priority: optional
+Architecture: all
+Depends: python3 (>= 3.10), python3-pyqt6, python3-dbus
+Recommends: pipewire-audio-client-libraries | pulseaudio-utils | alsa-utils, libnotify-bin
+Maintainer: FocusFlow Contributors <focusflow@localhost>
+Description: Native Linux Pomodoro Timer, Task Management & Productivity Tracker
+ FocusFlow is a lightweight, distraction-free desktop productivity application
+ engineered specifically for Linux distributions (Debian, Parrot OS, Ubuntu).
+ .
+ Key features:
+  - Drift-free Pomodoro timer with configurable focus and break cycles
+  - Always-on-top draggable floating timer widget
+  - Persistent todo system with priorities, tags, and pomodoro estimations
+  - Daily, weekly, and monthly productivity statistics and visual analytics
+  - System tray indicator with dynamic quick controls
+  - Native Linux desktop notifications and gentle sound effects
+  - 100% offline, local-first SQLite persistence with zero telemetry

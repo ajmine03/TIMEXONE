@@ -1,0 +1,11 @@
+focusflow (0.1.0-1) unstable; urgency=medium
+
+  * Initial release of FocusFlow:
+    - Drift-free Pomodoro timer engine.
+    - Always-on-top draggable floating timer widget.
+    - Persistent task management with priorities, tags, and pomodoro tracking.
+    - Daily, weekly, and monthly productivity statistics and visual charts.
+    - Native desktop notifications and system tray integration.
+    - Offline local-first SQLite persistence with migrations and backups.
+
+ -- FocusFlow Contributors <focusflow@localhost>  Tue, 22 Sep 2026 09:30:00 +0000

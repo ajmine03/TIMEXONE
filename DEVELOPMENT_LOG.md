@@ -290,3 +290,26 @@ This document tracks the chronological engineering progress, completed milestone
 
 ### Next Planned Milestone
 - Implement Debian Packaging (.deb) and Desktop Integration (`packaging/debian/`, `build_deb.sh`).
+
+---
+
+## Milestone 13: Debian Packaging (.deb) & System Integration
+
+### Date: 2026-09-22
+
+### Completed
+- Created Debian package specifications:
+  - `packaging/debian/control`: declared dependencies (`python3`, `python3-pyqt6`, `python3-dbus`, recommended audio utilities).
+  - `packaging/debian/copyright`: machine-readable DEP-5 copyright specification.
+  - `packaging/debian/changelog`: debian changelog for v0.1.0-1.
+  - `packaging/focusflow.desktop`: standard XDG desktop entry with actions for floating-only and minimized start.
+- Implemented `packaging/build_deb.sh`:
+  - Builds canonical staging layout: `/usr/bin/focusflow`, `/usr/lib/focusflow/`, `/usr/share/applications/`, `/usr/share/icons/hicolor/scalable/apps/focusflow.svg`.
+  - Configured `postinst` hook for `update-desktop-database` and `gtk-update-icon-cache`.
+  - Successfully generated and validated `packaging/dist/focusflow_0.1.0-1_all.deb` using `dpkg-deb`.
+
+### Git Commits
+- `build(packaging): add Debian package generation and desktop integration`
+
+### Next Planned Milestone
+- Complete comprehensive README.md, documentation, tag v0.1.0 release, and guide remote GitHub push.
