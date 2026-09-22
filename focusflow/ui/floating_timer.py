@@ -1,6 +1,6 @@
 """
 Always-on-top Floating Timer Widget for FocusFlow.
-Minimal, distraction-free desktop utility with reliable dragging,
+Minimal, distraction-free desktop utility with reliable Wayland/X11 dragging,
 multi-monitor safety, compact mode, and context menu.
 """
 
@@ -10,57 +10,17 @@ from PyQt6.QtWidgets import (
     QFrame, QMenu
 )
 from PyQt6.QtGui import QMouseEvent, QAction, QGuiApplication
-from PyQt6.QtCore import Qt, QPoint, QSize, QRect, pyqtSignal
+from PyQt6.QtCore import Qt, QPoint, QSize, QRect, QEvent, QTimer, pyqtSignal
 
 from focusflow.core.timer import PomodoroEngine, TimerState
 from focusflow.core.task_manager import TaskManager
 from focusflow.db.repository import Repository
 
 
-class DraggableFrame(QFrame):
-    """
-    Framed container that captures left-mouse drag events
-    and moves the parent window smoothly.
-    """
-
-    def __init__(self, parent_widget: "FloatingTimerWidget"):
-        super().__init__(parent_widget)
-        self.widget = parent_widget
-        self._dragging = False
-        self._drag_start = QPoint()
-
-    def mousePressEvent(self, event: QMouseEvent):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self._dragging = True
-            self._drag_start = event.globalPosition().toPoint() - self.widget.pos()
-            event.accept()
-            return
-        super().mousePressEvent(event)
-
-    def mouseMoveEvent(self, event: QMouseEvent):
-        if self._dragging and (event.buttons() & Qt.MouseButton.LeftButton):
-            self.widget.move(event.globalPosition().toPoint() - self._drag_start)
-            event.accept()
-            return
-        super().mouseMoveEvent(event)
-
-    def mouseReleaseEvent(self, event: QMouseEvent):
-        if self._dragging:
-            self._dragging = False
-            self.widget.save_position()
-            event.accept()
-            return
-        super().mouseReleaseEvent(event)
-
-    def contextMenuEvent(self, event):
-        self.widget.open_context_menu(event.globalPos())
-        event.accept()
-
-
 class FloatingTimerWidget(QWidget):
     """
     Clean, minimal, always-on-top draggable floating timer widget.
-    Focus is on the timer with minimal visual clutter.
+    Works reliably on both Wayland (KDE Plasma, GNOME) and X11.
     """
 
     visibility_changed = pyqtSignal(bool)
@@ -80,32 +40,40 @@ class FloatingTimerWidget(QWidget):
         self.task_manager = task_manager
         self.repo = repository
 
-        # Window Flags: Always on Top, Frameless, Tool window (no taskbar clutter)
-        self.setWindowFlags(
-            Qt.WindowType.WindowStaysOnTopHint
-            | Qt.WindowType.FramelessWindowHint
-            | Qt.WindowType.Tool
-        )
+        self.always_on_top = bool(self.repo.get_preference("floating_always_on_top", True))
+        self.is_compact = bool(self.repo.get_preference("floating_compact", False))
+        self.opacity = float(self.repo.get_preference("floating_opacity", 0.95))
+        self.auto_hide_controls = bool(self.repo.get_preference("floating_auto_hide_controls", False))
+
+        # Window Flags: Standard top-level Window + Frameless + Always on Top
+        # Avoid Qt.WindowType.Tool on Wayland (KDE Plasma) because KWin does not keep Tool above other windows
+        flags = Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint
+        if self.always_on_top:
+            flags |= Qt.WindowType.WindowStaysOnTopHint
+        self.setWindowFlags(flags)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
 
         self._dragging = False
         self._drag_start = QPoint()
 
-        self.is_compact = bool(self.repo.get_preference("floating_compact", False))
-        self.opacity = float(self.repo.get_preference("floating_opacity", 0.95))
-        self.auto_hide_controls = bool(self.repo.get_preference("floating_auto_hide_controls", False))
+        # Debounce timer to save coordinates after dragging finishes
+        self._save_debounce_timer = QTimer(self)
+        self._save_debounce_timer.setSingleShot(True)
+        self._save_debounce_timer.setInterval(400)
+        self._save_debounce_timer.timeout.connect(self.save_position)
 
         self._init_ui()
         self._load_saved_geometry()
         self._connect_signals()
+        self._install_drag_filters()
         self._update_display(self.engine.remaining_seconds)
 
     def _init_ui(self):
         root_layout = QVBoxLayout(self)
         root_layout.setContentsMargins(4, 4, 4, 4)
 
-        # Draggable card frame
-        self.frame = DraggableFrame(self)
+        # Main styled card frame
+        self.frame = QFrame(self)
         self.frame.setObjectName("FloatingCard")
         self.frame.setStyleSheet("""
             QFrame#FloatingCard {
@@ -135,55 +103,52 @@ class FloatingTimerWidget(QWidget):
         # ---------------------------------------------------------------------
         # 1. Normal Mode Container
         # ---------------------------------------------------------------------
-        self.normal_box = QWidget()
+        self.normal_box = QWidget(self.frame)
         self.normal_layout = QVBoxLayout(self.normal_box)
         self.normal_layout.setContentsMargins(0, 0, 0, 0)
         self.normal_layout.setSpacing(3)
         self.normal_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # State label (e.g. FOCUS, SHORT BREAK, PAUSED)
-        self.state_label = QLabel("FOCUS")
+        # State label (FOCUS, SHORT BREAK, PAUSED, etc.)
+        self.state_label = QLabel("FOCUS", self.normal_box)
         self.state_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.state_label.setStyleSheet("color: #06b6d4; font-size: 10px; font-weight: bold; letter-spacing: 1.5px;")
-        self.state_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.normal_layout.addWidget(self.state_label)
 
-        # Timer label (Big, bold, clean)
-        self.time_label = QLabel("25:00")
+        # Countdown Timer (Big, clear, bold)
+        self.time_label = QLabel("25:00", self.normal_box)
         self.time_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.time_label.setStyleSheet("color: #ffffff; font-size: 28px; font-weight: bold; font-family: 'Inter', 'Noto Sans', sans-serif;")
-        self.time_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.normal_layout.addWidget(self.time_label)
 
         # Task title (Subtle)
-        self.task_label = QLabel("General Focus")
+        self.task_label = QLabel("General Focus", self.normal_box)
         self.task_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.task_label.setStyleSheet("color: #a6adc8; font-size: 11px;")
-        self.task_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.normal_layout.addWidget(self.task_label)
 
-        # Controls row (Play/Pause, Stop, Options menu)
-        self.controls_row_widget = QWidget()
+        # Minimal controls row (Play/Pause, Stop, Menu)
+        self.controls_row_widget = QWidget(self.normal_box)
         controls_row = QHBoxLayout(self.controls_row_widget)
         controls_row.setContentsMargins(0, 2, 0, 0)
         controls_row.setSpacing(6)
         controls_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.btn_play_pause = QPushButton("▶")
+        self.btn_play_pause = QPushButton("▶", self.controls_row_widget)
         self.btn_play_pause.setFixedSize(28, 24)
         self.btn_play_pause.setToolTip("Start / Pause Timer")
         self.btn_play_pause.clicked.connect(self.engine.toggle_play_pause)
         controls_row.addWidget(self.btn_play_pause)
 
-        self.btn_stop = QPushButton("■")
+        self.btn_stop = QPushButton("■", self.controls_row_widget)
         self.btn_stop.setFixedSize(28, 24)
         self.btn_stop.setToolTip("Stop Timer")
         self.btn_stop.clicked.connect(self.engine.stop)
         controls_row.addWidget(self.btn_stop)
 
-        self.btn_more = QPushButton("⋮")
+        self.btn_more = QPushButton("⋮", self.controls_row_widget)
         self.btn_more.setFixedSize(24, 24)
-        self.btn_more.setToolTip("Options (Right-click also opens menu)")
+        self.btn_more.setToolTip("Options (Right-click anywhere also opens menu)")
         self.btn_more.clicked.connect(self._show_options_from_btn)
         controls_row.addWidget(self.btn_more)
 
@@ -193,33 +158,31 @@ class FloatingTimerWidget(QWidget):
         # ---------------------------------------------------------------------
         # 2. Compact Mode Container: [ 24:37  ▶  ⋮ ]
         # ---------------------------------------------------------------------
-        self.compact_box = QWidget()
+        self.compact_box = QWidget(self.frame)
         compact_layout = QHBoxLayout(self.compact_box)
         compact_layout.setContentsMargins(2, 0, 2, 0)
         compact_layout.setSpacing(6)
         compact_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.compact_time_label = QLabel("25:00")
+        self.compact_time_label = QLabel("25:00", self.compact_box)
         self.compact_time_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.compact_time_label.setStyleSheet("color: #ffffff; font-size: 18px; font-weight: bold;")
-        self.compact_time_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         compact_layout.addWidget(self.compact_time_label)
 
-        self.compact_btn_play_pause = QPushButton("▶")
+        self.compact_btn_play_pause = QPushButton("▶", self.compact_box)
         self.compact_btn_play_pause.setFixedSize(26, 22)
         self.compact_btn_play_pause.clicked.connect(self.engine.toggle_play_pause)
         compact_layout.addWidget(self.compact_btn_play_pause)
 
-        self.compact_btn_more = QPushButton("⋮")
+        self.compact_btn_more = QPushButton("⋮", self.compact_box)
         self.compact_btn_more.setFixedSize(22, 22)
         self.compact_btn_more.clicked.connect(self._show_options_from_compact_btn)
         compact_layout.addWidget(self.compact_btn_more)
 
         card_layout.addWidget(self.compact_box)
-
         root_layout.addWidget(self.frame)
 
-        # Apply initial mode
+        # Apply initial mode layout
         if self.is_compact:
             self.normal_box.hide()
             self.compact_box.show()
@@ -233,33 +196,87 @@ class FloatingTimerWidget(QWidget):
             else:
                 self.resize(175, 110)
 
+    def _install_drag_filters(self):
+        """
+        Installs an event filter on all non-button child widgets.
+        Ensures dragging works from anywhere: text labels, frame background, margins.
+        """
+        self.installEventFilter(self)
+        for child in self.findChildren(QWidget):
+            if not isinstance(child, QPushButton):
+                child.installEventFilter(self)
+
     def _connect_signals(self):
         self.engine.subscribe_tick(self._on_tick)
         self.engine.subscribe_state_changed(self._on_state_changed)
 
     # -------------------------------------------------------------------------
-    # Drag and Multi-Monitor Geometry Logic
+    # Drag Event Filter: Native Wayland (KWin) & X11 Drag Handling
+    # -------------------------------------------------------------------------
+    def eventFilter(self, watched, event: QEvent) -> bool:
+        # Never intercept events for buttons so clicks/hover work normally
+        if isinstance(watched, QPushButton):
+            return False
+
+        if event.type() == QEvent.Type.MouseButtonPress:
+            if event.button() == Qt.MouseButton.LeftButton:
+                # 1. On Wayland (KDE Plasma) and X11: start native system move
+                handle = self.windowHandle()
+                if handle:
+                    try:
+                        if handle.startSystemMove():
+                            return True
+                    except Exception:
+                        pass
+
+                # 2. Client-side move fallback (X11 / offscreen)
+                self._dragging = True
+                self._drag_start = event.globalPosition().toPoint() - self.pos()
+                return True
+
+            elif event.button() == Qt.MouseButton.RightButton:
+                self.open_context_menu(event.globalPosition().toPoint())
+                return True
+
+        elif event.type() == QEvent.Type.MouseMove:
+            if self._dragging and (event.buttons() & Qt.MouseButton.LeftButton):
+                self.move(event.globalPosition().toPoint() - self._drag_start)
+                return True
+
+        elif event.type() == QEvent.Type.MouseButtonRelease:
+            if self._dragging:
+                self._dragging = False
+                self.save_position()
+                return True
+
+        return super().eventFilter(watched, event)
+
+    def moveEvent(self, event):
+        super().moveEvent(event)
+        # When moved by Wayland compositor, debounce saving the new coordinates
+        self._save_debounce_timer.start()
+
+    # -------------------------------------------------------------------------
+    # Multi-Monitor Safety & Persistence
     # -------------------------------------------------------------------------
     @staticmethod
     def ensure_on_screen(pos: QPoint, size: QSize) -> QPoint:
         """
         Verify that pos is within the visible bounds of at least one connected screen.
-        If off-screen or monitor was unplugged, reposition onto primary screen.
+        If off-screen or an external monitor was disconnected, fallback to primary screen.
         """
         screens = QGuiApplication.screens()
         if not screens:
             return pos
 
         widget_rect = QRect(pos, size)
-
-        # Check if widget intersects any available screen geometry with >= 20px overlap
         for screen in screens:
             avail = screen.availableGeometry()
             intersection = avail.intersected(widget_rect)
             if intersection.width() >= 20 and intersection.height() >= 20:
                 return pos
 
-        # Fallback to primary screen
+        # Off-screen fallback
         primary = QGuiApplication.primaryScreen() or screens[0]
         avail = primary.availableGeometry()
         safe_x = avail.x() + avail.width() - size.width() - 32
@@ -269,8 +286,7 @@ class FloatingTimerWidget(QWidget):
     def _load_saved_geometry(self):
         saved_x = int(self.repo.get_preference("floating_x", 120))
         saved_y = int(self.repo.get_preference("floating_y", 120))
-        self.opacity = float(self.repo.get_preference("floating_opacity", 0.95))
-        self.setWindowOpacity(self.opacity)
+        self.set_opacity(self.opacity)
 
         safe_pos = self.ensure_on_screen(QPoint(saved_x, saved_y), self.size())
         self.move(safe_pos)
@@ -279,30 +295,6 @@ class FloatingTimerWidget(QWidget):
         """Save current widget coordinates to preferences."""
         self.repo.set_preference("floating_x", self.x())
         self.repo.set_preference("floating_y", self.y())
-
-    # Fallback drag handling on the root widget itself
-    def mousePressEvent(self, event: QMouseEvent):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self._dragging = True
-            self._drag_start = event.globalPosition().toPoint() - self.pos()
-            event.accept()
-            return
-        super().mousePressEvent(event)
-
-    def mouseMoveEvent(self, event: QMouseEvent):
-        if self._dragging and (event.buttons() & Qt.MouseButton.LeftButton):
-            self.move(event.globalPosition().toPoint() - self._drag_start)
-            event.accept()
-            return
-        super().mouseMoveEvent(event)
-
-    def mouseReleaseEvent(self, event: QMouseEvent):
-        if self._dragging:
-            self._dragging = False
-            self.save_position()
-            event.accept()
-            return
-        super().mouseReleaseEvent(event)
 
     # -------------------------------------------------------------------------
     # Auto-Hide Controls on Hover
@@ -320,7 +312,7 @@ class FloatingTimerWidget(QWidget):
             self.resize(175, 84)
 
     # -------------------------------------------------------------------------
-    # Mode & Opacity Toggles
+    # Mode, Opacity & Always-On-Top Toggles
     # -------------------------------------------------------------------------
     def toggle_compact_mode(self):
         self.is_compact = not self.is_compact
@@ -338,6 +330,15 @@ class FloatingTimerWidget(QWidget):
             else:
                 self.controls_row_widget.show()
                 self.resize(175, 110)
+        self._reinstall_filters_later()
+
+    def toggle_always_on_top(self):
+        self.always_on_top = not self.always_on_top
+        self.repo.set_preference("floating_always_on_top", self.always_on_top)
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, self.always_on_top)
+        self.show()
+        if self.always_on_top:
+            self.raise_()
 
     def toggle_auto_hide_controls(self):
         self.auto_hide_controls = not self.auto_hide_controls
@@ -354,6 +355,9 @@ class FloatingTimerWidget(QWidget):
         self.opacity = value
         self.setWindowOpacity(value)
         self.repo.set_preference("floating_opacity", value)
+
+    def _reinstall_filters_later(self):
+        QTimer.singleShot(50, self._install_drag_filters)
 
     # -------------------------------------------------------------------------
     # Timer Event Observers
@@ -404,6 +408,8 @@ class FloatingTimerWidget(QWidget):
             self.compact_btn_play_pause.setText("▶")
 
         self._update_display(self.engine.remaining_seconds)
+        if self.always_on_top:
+            self.raise_()
 
     # -------------------------------------------------------------------------
     # Context Menu
@@ -413,10 +419,6 @@ class FloatingTimerWidget(QWidget):
 
     def _show_options_from_compact_btn(self):
         self.open_context_menu(self.compact_btn_more.mapToGlobal(QPoint(0, self.compact_btn_more.height())))
-
-    def contextMenuEvent(self, event):
-        self.open_context_menu(event.globalPos())
-        event.accept()
 
     def open_context_menu(self, global_pos: QPoint):
         menu = QMenu(self)
@@ -468,6 +470,13 @@ class FloatingTimerWidget(QWidget):
 
         menu.addSeparator()
 
+        # Always on Top Toggle
+        act_above = QAction("Keep Always on Top", self)
+        act_above.setCheckable(True)
+        act_above.setChecked(self.always_on_top)
+        act_above.triggered.connect(self.toggle_always_on_top)
+        menu.addAction(act_above)
+
         # Modes & Appearance
         act_compact = QAction("Compact Mode", self)
         act_compact.setCheckable(True)
@@ -510,6 +519,8 @@ class FloatingTimerWidget(QWidget):
 
     def showEvent(self, event):
         super().showEvent(event)
+        if self.always_on_top:
+            self.raise_()
         self.visibility_changed.emit(True)
 
     def hideEvent(self, event):
