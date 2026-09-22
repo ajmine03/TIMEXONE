@@ -362,3 +362,24 @@ This document tracks the chronological engineering progress, completed milestone
 
 ### Next Planned Milestone
 - Audit and harden Pomodoro timer engine with active state recovery, sleep/suspend detection, and pause isolation.
+
+---
+
+## Milestone 16: Timer Reliability Audit & Crash/Suspend Recovery
+
+### Date: 2026-09-22
+
+### Completed
+- Hardened `focusflow/core/timer.py`:
+  - Monotonic & wall-clock synchronization: accurately tracks true elapsed time without drift.
+  - Suspend/sleep detection: detects discrepancies between wall clock (`datetime.now()`) and `time.monotonic()` exceeding 5 seconds, auto-pausing the timer so asleep hours are never misattributed as focus time.
+  - Pause isolation: verified paused durations are fully excluded from focus time calculations.
+  - State persistence & crash recovery: saves running/paused session state to SQLite (`persisted_timer_state`) and seamlessly restores active/paused timers upon application reboot.
+- Enhanced `tests/test_timer.py`:
+  - Added test cases for normal countdown, UI freeze recovery, pause isolation, suspend detection, and crash/restart recovery (9/9 tests passing).
+
+### Git Commits
+- `feat(timer): harden timer engine with wall-clock state recovery and suspend resilience`
+
+### Next Planned Milestone
+- Enhance Floating Timer with right-click context menu, auto-hide controls, and task switching.

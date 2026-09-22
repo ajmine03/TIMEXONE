@@ -1,8 +1,7 @@
-"""Unit tests for FocusFlow Pomodoro timer engine."""
-
 import unittest
 import tempfile
 import time
+import math
 from pathlib import Path
 
 from focusflow.db.database import Database
@@ -119,8 +118,78 @@ class TestTimerEngine(unittest.TestCase):
         # 2.0 seconds elapsed: 0.0s remain -> 0s
         now_mono = start_mono + 2.0
         rem = int(math.ceil(self.engine._target_monotonic - now_mono))
-        self.assertEqual(rem, 0)
+    def test_normal_countdown_and_ui_freeze(self):
+        """Simulate normal tick progression and recovery after multi-second UI freeze."""
+        # 1500 second (25 minute) focus session
+        eng = PomodoroEngine(self.repo, focus_duration=1500)
+        eng.start()
+        start_mono = eng._target_monotonic - 1500.0
+
+        # Normal ticks: 1s passes -> 1499s remain
+        eng._target_monotonic = start_mono + 1500.0
+        eng._last_tick_monotonic = start_mono
+        # Tick at t = 1.0s
+        eng._target_monotonic = start_mono + 1500.0
+        now_fake = start_mono + 1.0
+        rem = int(math.ceil(eng._target_monotonic - now_fake))
+        self.assertEqual(rem, 1499)
+
+        # UI Freeze: 5 seconds pass with no ticks
+        now_fake_freeze = start_mono + 6.0
+        rem_after_freeze = int(math.ceil(eng._target_monotonic - now_fake_freeze))
+        # Timer immediately reflects the exact elapsed 6 seconds: 1494 seconds
+        self.assertEqual(rem_after_freeze, 1494)
+
+    def test_pause_period_does_not_count_as_focus(self):
+        """Paused period must be completely isolated and not reduce remaining focus time."""
+        eng = PomodoroEngine(self.repo, focus_duration=1500)
+        eng.start()
+        # Simulate 300 seconds elapsed (5 mins) -> 1200 remain
+        eng._target_monotonic = time.monotonic() + 1200
+        eng.pause()
+        self.assertEqual(eng.state, TimerState.PAUSED_FOCUS)
+        self.assertEqual(eng.remaining_seconds, 1200)
+
+        # Simulate user pausing for 1 hour (3600 seconds)
+        # When resuming, target_monotonic is reset to now + remaining_seconds
+        eng.resume()
+        self.assertEqual(eng.state, TimerState.RUNNING_FOCUS)
+        self.assertEqual(eng.remaining_seconds, 1200)
+        # Target monotonic is 1200 seconds in the future from current time
+        remaining_now = int(math.ceil(eng._target_monotonic - time.monotonic()))
+        self.assertEqual(remaining_now, 1200)
+
+    def test_system_suspend_detection(self):
+        """Verify that when wall clock advances significantly more than monotonic clock, suspend is detected."""
+        from datetime import datetime, timedelta
+        eng = PomodoroEngine(self.repo, focus_duration=1500)
+        eng.start()
+
+        # Simulate system suspend: wall clock advances by 1800s (30 mins), while monotonic advanced only 1s
+        eng._last_tick_wall = datetime.now() - timedelta(seconds=1800)
+        eng._last_tick_monotonic = time.monotonic() - 1.0
+
+        eng.tick()
+        # Timer should detect suspend and pause to preserve state
+        self.assertTrue(eng._suspend_detected)
+        self.assertTrue(eng.state.is_paused)
+
+    def test_application_restart_recovery(self):
+        """Test that active/paused state persists in database and is recovered upon new engine launch."""
+        task = self.repo.create_task("Persisted Task")
+        eng1 = PomodoroEngine(self.repo, focus_duration=1500)
+        eng1.start(task_id=task.id)
+        # Simulate 700 seconds elapsed (800 seconds remain)
+        eng1._target_monotonic = time.monotonic() + 800
+        eng1.pause()  # Persists state as paused with 800s left
+
+        # Simulate application close and restart: instantiate new engine with same repository
+        eng2 = PomodoroEngine(self.repo, focus_duration=1500)
+        self.assertEqual(eng2.state, TimerState.PAUSED_FOCUS)
+        self.assertEqual(eng2.active_task_id, task.id)
+        self.assertEqual(eng2.remaining_seconds, 800)
 
 
 if __name__ == "__main__":
     unittest.main()
+

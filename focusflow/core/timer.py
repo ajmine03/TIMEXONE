@@ -91,12 +91,19 @@ class PomodoroEngine:
         self.remaining_seconds: int = self.focus_duration
         self._target_monotonic: float = 0.0
         self._session_start_wall: Optional[datetime] = None
+        self._last_tick_monotonic: float = time.monotonic()
+        self._last_tick_wall: datetime = datetime.now()
         self._elapsed_in_session: int = 0
+        self._suspend_detected: bool = False
 
         # Observers / Callbacks
         self._on_tick_callbacks: List[Callable[[int, int, float], None]] = []
         self._on_state_changed_callbacks: List[Callable[[TimerState], None]] = []
         self._on_completed_callbacks: List[Callable[[TimerState, Optional[str]], None]] = []
+
+        # Attempt to recover saved state if repository provided
+        if self.repo:
+            self.recover_saved_state()
 
     # -------------------------------------------------------------------------
     # Callback Registration
@@ -125,11 +132,109 @@ class PomodoroEngine:
     def _set_state(self, new_state: TimerState):
         if self.state != new_state:
             self.state = new_state
+            self.persist_active_state()
             for cb in self._on_state_changed_callbacks:
                 try:
                     cb(new_state)
                 except Exception as e:
                     logger.error("Error in state_changed callback: %s", e)
+
+    # -------------------------------------------------------------------------
+    # State Persistence & Recovery
+    # -------------------------------------------------------------------------
+    def persist_active_state(self):
+        """Save current active timer state to database for crash/restart recovery."""
+        if not self.repo:
+            return
+        if self.state == TimerState.IDLE:
+            self.clear_persisted_state()
+            return
+
+        state_data = {
+            "state": self.state.value,
+            "active_task_id": self.active_task_id,
+            "remaining_seconds": self.remaining_seconds,
+            "total_duration": self.total_duration,
+            "session_start_wall": self._session_start_wall.isoformat() if self._session_start_wall else None,
+            "last_tick_wall": datetime.now().isoformat(),
+            "target_monotonic_remaining": max(0, int(math.ceil(self._target_monotonic - time.monotonic()))) if self.state.is_running else self.remaining_seconds,
+        }
+        self.repo.set_preference("persisted_timer_state", state_data)
+
+    def clear_persisted_state(self):
+        """Clear persisted timer state when idle."""
+        if self.repo:
+            self.repo.set_preference("persisted_timer_state", None)
+
+    def recover_saved_state(self) -> bool:
+        """
+        Check for previously active timer session on app launch.
+        Recovers paused or interrupted sessions cleanly.
+        """
+        if not self.repo:
+            return False
+        data = self.repo.get_preference("persisted_timer_state", None)
+        if not data or not isinstance(data, dict):
+            return False
+
+        saved_state_str = data.get("state")
+        if not saved_state_str or saved_state_str == "idle":
+            return False
+
+        try:
+            saved_state = TimerState(saved_state_str)
+            self.active_task_id = data.get("active_task_id")
+            self.total_duration = data.get("total_duration", self.focus_duration)
+            remaining = data.get("remaining_seconds", self.focus_duration)
+            start_wall_str = data.get("session_start_wall")
+            self._session_start_wall = datetime.fromisoformat(start_wall_str) if start_wall_str else datetime.now()
+
+            # If it was paused, recover as paused
+            if saved_state.is_paused:
+                self.remaining_seconds = remaining
+                self.state = saved_state
+                logger.info("Recovered paused timer state: %s with %d seconds remaining", saved_state, remaining)
+                return True
+
+            # If it was running when closed, check elapsed wall-clock time
+            last_tick_str = data.get("last_tick_wall")
+            if last_tick_str:
+                last_tick_dt = datetime.fromisoformat(last_tick_str)
+                wall_elapsed = int((datetime.now() - last_tick_dt).total_seconds())
+
+                if wall_elapsed >= remaining:
+                    # App was closed long enough that timer expired while away
+                    logger.info("Previous timer expired while app was closed (%d seconds elapsed)", wall_elapsed)
+                    # Record the session as completed or interrupted based on duration
+                    if saved_state.is_focus and self._session_start_wall:
+                        self.repo.record_session(
+                            task_id=self.active_task_id,
+                            session_type="focus",
+                            start_time=self._session_start_wall.isoformat(),
+                            end_time=datetime.now().isoformat(),
+                            duration_seconds=self.total_duration,
+                            status="completed",
+                        )
+                    self.clear_persisted_state()
+                    self.state = TimerState.IDLE
+                    self.remaining_seconds = self.focus_duration
+                    return False
+                else:
+                    # Still within session time! Restore remaining and set paused so user can resume
+                    new_remaining = max(0, remaining - wall_elapsed)
+                    self.remaining_seconds = new_remaining
+                    if saved_state == TimerState.RUNNING_FOCUS:
+                        self.state = TimerState.PAUSED_FOCUS
+                    elif saved_state == TimerState.RUNNING_SHORT_BREAK:
+                        self.state = TimerState.PAUSED_SHORT_BREAK
+                    else:
+                        self.state = TimerState.PAUSED_LONG_BREAK
+                    logger.info("Restored running timer state to paused with %d seconds remaining", new_remaining)
+                    return True
+        except Exception as e:
+            logger.error("Failed to recover persisted timer state: %s", e)
+            self.clear_persisted_state()
+            return False
 
     # -------------------------------------------------------------------------
     # Timer Controls
@@ -265,6 +370,22 @@ class PomodoroEngine:
             return
 
         now_mono = time.monotonic()
+        now_wall = datetime.now()
+        wall_delta = (now_wall - self._last_tick_wall).total_seconds()
+        mono_delta = now_mono - self._last_tick_monotonic
+
+        # If wall clock advanced significantly more than monotonic clock, system was suspended/slept
+        if wall_delta > 10.0 and (wall_delta - mono_delta) > 5.0:
+            logger.info("System suspend detected (wall delta %.1fs, mono delta %.1fs). Pausing timer to preserve state.", wall_delta, mono_delta)
+            self._suspend_detected = True
+            self._last_tick_wall = now_wall
+            self._last_tick_monotonic = now_mono
+            self.pause()
+            return
+
+        self._last_tick_wall = now_wall
+        self._last_tick_monotonic = now_mono
+
         remaining = int(math.ceil(self._target_monotonic - now_mono))
 
         if remaining <= 0:
@@ -274,6 +395,9 @@ class PomodoroEngine:
         else:
             self.remaining_seconds = remaining
             self._notify_tick()
+            # Persist state periodically
+            if remaining % 5 == 0:
+                self.persist_active_state()
 
     def _handle_completed(self):
         """Handles expiration of a timer session."""
