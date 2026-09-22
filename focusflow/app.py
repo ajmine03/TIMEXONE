@@ -33,12 +33,16 @@ from focusflow.ui.wizard import FirstRunWizard
 import logging.handlers
 
 # Setup persistent file logging alongside stderr
-handlers = [logging.StreamHandler(sys.stderr)]
+console_handler = logging.StreamHandler(sys.stderr)
+console_handler.setLevel(logging.WARNING)  # Keep normal GUI startup quiet on terminal
+
+handlers = [console_handler]
 try:
     LOG_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
     file_handler = logging.handlers.RotatingFileHandler(
         LOG_FILE_PATH, maxBytes=1024 * 1024 * 2, backupCount=3, encoding="utf-8"
     )
+    file_handler.setLevel(logging.INFO)  # Diagnostic logs go to file
     handlers.append(file_handler)
 except Exception:
     pass
@@ -246,7 +250,8 @@ def main():
     focusflow_app = FocusFlowApp(db_path=db_path, test_mode=args.test_mode)
 
     if args.test_mode:
-        # Test mode execution: verify startup, tick once, and exit 0
+        # Test mode execution: enable console logging for verification, tick once, and exit 0
+        console_handler.setLevel(logging.INFO)
         focusflow_app.run(start_minimized=True)
         focusflow_app._on_heartbeat()
         logger.info("FocusFlow sanity test passed successfully.")
@@ -256,10 +261,13 @@ def main():
 
     if args.start:
         focusflow_app.engine.start()
+        print("FocusFlow: Focus session started.")
     elif args.pause:
         focusflow_app.engine.pause()
+        print("FocusFlow: Timer paused.")
     elif args.stop:
         focusflow_app.engine.stop()
+        print("FocusFlow: Timer stopped.")
 
     if args.show:
         focusflow_app.main_window.show()
