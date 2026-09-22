@@ -573,5 +573,7 @@ This document tracks the chronological engineering progress, completed milestone
 ### Git Commits
 - `fix(logging): silence normal GUI stdout output`
 - `fix(floating): clean up widget and restore drag interaction`
+- `fix(floating): enable Wayland startSystemMove, drag filter, and always-on-top mode`
+
 
 
