@@ -31,11 +31,15 @@ class IdleDetector(QObject):
     """Detects system-wide user inactivity using standard Linux APIs."""
 
     idle_threshold_exceeded = pyqtSignal(int)  # idle_seconds
+    returned_from_idle = pyqtSignal(int)       # past_idle_seconds
 
     def __init__(self, repository: Repository, engine: PomodoroEngine, parent=None):
         super().__init__(parent)
         self.repo = repository
         self.engine = engine
+
+        self._is_idle = False
+        self._idle_seconds_accumulated = 0
 
         self._x11_display = None
         self._xss_lib = None
@@ -102,8 +106,11 @@ class IdleDetector(QObject):
         return None
 
     def check_idle(self):
-        """Called once every 10-30s during active focus sessions."""
-        if not self.engine.state.is_running or not self.engine.state.is_focus:
+        """Called once every heartbeat tick."""
+        if not self.engine.state.is_focus:
+            if self._is_idle:
+                self._is_idle = False
+                self._idle_seconds_accumulated = 0
             return
 
         idle_sec = self.get_idle_seconds()
@@ -111,8 +118,20 @@ class IdleDetector(QObject):
             return
 
         threshold = int(self.repo.get_preference("idle_threshold_seconds", 300))
+
         if idle_sec >= threshold:
-            action = self.repo.get_preference("idle_action", "ask")
-            if action == "pause":
-                self.engine.pause()
-            self.idle_threshold_exceeded.emit(idle_sec)
+            if not self._is_idle:
+                self._is_idle = True
+                self._idle_seconds_accumulated = idle_sec
+                action = self.repo.get_preference("idle_action", "ask")
+                if action == "pause":
+                    self.engine.pause()
+                self.idle_threshold_exceeded.emit(idle_sec)
+            else:
+                self._idle_seconds_accumulated = max(self._idle_seconds_accumulated, idle_sec)
+        else:
+            if self._is_idle:
+                past_idle = self._idle_seconds_accumulated
+                self._is_idle = False
+                self._idle_seconds_accumulated = 0
+                self.returned_from_idle.emit(past_idle)

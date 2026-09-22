@@ -44,6 +44,33 @@ class TestIdleDetector(unittest.TestCase):
         # Engine should have been paused automatically
         self.assertEqual(self.engine.state, TimerState.PAUSED_FOCUS)
 
+    def test_idle_return_signal(self):
+        self.repo.set_preference("idle_action", "pause")
+        self.repo.set_preference("idle_threshold_seconds", 300)
+
+        returned_payload = []
+        self.detector.returned_from_idle.connect(lambda sec: returned_payload.append(sec))
+
+        self.engine.start()
+
+        # 1. User becomes idle (exceeds 300s)
+        self.detector.get_idle_seconds = MagicMock(return_value=350)
+        self.detector.check_idle()
+        self.assertEqual(len(returned_payload), 0)
+
+        # 2. Inactive time increases
+        self.detector.get_idle_seconds = MagicMock(return_value=420)
+        self.detector.check_idle()
+        self.assertEqual(len(returned_payload), 0)
+
+        # 3. User returns (idle time drops to 0)
+        self.detector.get_idle_seconds = MagicMock(return_value=0)
+        self.detector.check_idle()
+
+        # Signal should have fired with the max accumulated idle duration
+        self.assertEqual(len(returned_payload), 1)
+        self.assertEqual(returned_payload[0], 420)
+
 
 if __name__ == "__main__":
     unittest.main()

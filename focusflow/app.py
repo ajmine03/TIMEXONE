@@ -101,6 +101,33 @@ class FocusFlowApp:
         self.engine.subscribe_completed(self._on_session_completed)
         self.engine.subscribe_state_changed(self._on_engine_state_changed)
 
+        # 5. Inactivity return handling
+        self.idle_detector.returned_from_idle.connect(self._on_user_returned_from_idle)
+
+    def _on_user_returned_from_idle(self, idle_seconds: int):
+        if self.test_mode or not self.engine.state.is_focus:
+            return
+
+        from focusflow.ui.components.idle_dialog import IdleReturnDialog
+        parent_win = self.main_window if self.main_window.isVisible() else self.floating_timer
+        dlg = IdleReturnDialog(idle_seconds=idle_seconds, parent=parent_win)
+        dlg.exec()
+
+        action = dlg.selected_action
+        if action == IdleReturnDialog.KEEP_TIME:
+            if self.engine.state.is_paused:
+                self.engine.resume()
+        elif action == IdleReturnDialog.DISCARD_AND_PAUSE:
+            self.engine.adjust_remaining_time(idle_seconds)
+            if self.engine.state.is_running:
+                self.engine.pause()
+        elif action == IdleReturnDialog.DISCARD_AND_RESUME:
+            self.engine.adjust_remaining_time(idle_seconds)
+            if self.engine.state.is_paused:
+                self.engine.resume()
+        elif action == IdleReturnDialog.DISCARD_SESSION:
+            self.engine.stop(save_interrupted=False)
+
     def _setup_heartbeat_timer(self):
         """1-second tick loop driving timer engine, idle checks, and reminders."""
         self.timer = QTimer()

@@ -509,3 +509,15 @@ class PomodoroEngine:
             self.total_duration = self.focus_duration
             self.remaining_seconds = self.focus_duration
             self._notify_tick()
+
+    def adjust_remaining_time(self, delta_seconds: int):
+        """
+        Adjust remaining time by delta_seconds (positive adds time, negative removes time).
+        Clamped between 0 and total_duration.
+        """
+        new_remaining = max(0, min(self.total_duration, self.remaining_seconds + delta_seconds))
+        self.remaining_seconds = new_remaining
+        if self.state.is_running:
+            self._target_monotonic = time.monotonic() + self.remaining_seconds
+        self._notify_tick()
+
