@@ -84,7 +84,14 @@ class PomodoroEngine:
 
         self.state = TimerState.IDLE
         self.active_task_id: Optional[str] = None
+        self._current_day = datetime.now().date()
         self.completed_cycles_today: int = 0
+        if self.repo:
+            try:
+                today_stats = self.repo.get_daily_stats(self._current_day.isoformat())
+                self.completed_cycles_today = today_stats.pomodoros_completed
+            except Exception:
+                self.completed_cycles_today = 0
 
         # Timing variables
         self.total_duration: int = self.focus_duration
@@ -325,8 +332,66 @@ class PomodoroEngine:
         self._set_state(TimerState.IDLE)
         self._notify_tick()
 
+    @property
+    def current_mode(self) -> str:
+        """Return 'focus', 'short_break', or 'long_break' representing the active timer mode."""
+        if self.state in (TimerState.RUNNING_SHORT_BREAK, TimerState.PAUSED_SHORT_BREAK):
+            return "short_break"
+        elif self.state in (TimerState.RUNNING_LONG_BREAK, TimerState.PAUSED_LONG_BREAK):
+            return "long_break"
+        elif self.state in (TimerState.RUNNING_FOCUS, TimerState.PAUSED_FOCUS):
+            return "focus"
+        else:
+            if self.total_duration == self.short_break_duration:
+                return "short_break"
+            elif self.total_duration == self.long_break_duration:
+                return "long_break"
+            return "focus"
+
+    def switch_mode(self, mode: str, auto_start: bool = False):
+        """
+        Directly switch to 'focus', 'short_break', or 'long_break'.
+        Preserves interrupted session if elapsed >= 15s.
+        """
+        if self.state.is_running or self.state.is_paused:
+            self.stop(save_interrupted=True)
+
+        mode_clean = mode.lower().strip()
+        if mode_clean in ("focus", "pomodoro"):
+            self.total_duration = self.focus_duration
+            self.remaining_seconds = self.focus_duration
+            self._set_state(TimerState.RUNNING_FOCUS if auto_start else TimerState.IDLE)
+        elif mode_clean in ("short_break", "short"):
+            self.total_duration = self.short_break_duration
+            self.remaining_seconds = self.short_break_duration
+            self._set_state(TimerState.RUNNING_SHORT_BREAK if auto_start else TimerState.PAUSED_SHORT_BREAK)
+        elif mode_clean in ("long_break", "long"):
+            self.total_duration = self.long_break_duration
+            self.remaining_seconds = self.long_break_duration
+            self._set_state(TimerState.RUNNING_LONG_BREAK if auto_start else TimerState.PAUSED_LONG_BREAK)
+
+        if auto_start:
+            self._session_start_wall = datetime.now()
+            self._target_monotonic = time.monotonic() + self.remaining_seconds
+
+        self._notify_tick()
+
     def restart(self):
-        """Restart current session from beginning."""
+        """Restart current session from beginning, saving interrupted focus time if >= 15s."""
+        if self.state.is_focus and self._session_start_wall and self.repo:
+            elapsed = self.total_duration - self.remaining_seconds
+            if elapsed >= 15:
+                now_wall = datetime.now()
+                self.repo.record_session(
+                    task_id=self.active_task_id,
+                    session_type="focus",
+                    start_time=self._session_start_wall.isoformat(),
+                    end_time=now_wall.isoformat(),
+                    duration_seconds=elapsed,
+                    status="interrupted",
+                )
+
+        self._elapsed_in_session = 0
         if self.state.is_focus:
             self.total_duration = self.focus_duration
             self.remaining_seconds = self.focus_duration
@@ -352,11 +417,27 @@ class PomodoroEngine:
     def skip(self):
         """Skip current session to the next phase in the cycle."""
         if self.state.is_focus:
+            # If elapsed >= 15s, save interrupted session so user focus time is not lost
+            if self._session_start_wall and self.repo:
+                elapsed = self.total_duration - self.remaining_seconds
+                if elapsed >= 15:
+                    now_wall = datetime.now()
+                    self.repo.record_session(
+                        task_id=self.active_task_id,
+                        session_type="focus",
+                        start_time=self._session_start_wall.isoformat(),
+                        end_time=now_wall.isoformat(),
+                        duration_seconds=elapsed,
+                        status="interrupted",
+                    )
             self._transition_to_break()
         elif self.state.is_break:
             self._transition_to_focus()
         else:
-            self.start()
+            if self.total_duration == self.focus_duration:
+                self._transition_to_break()
+            else:
+                self._transition_to_focus()
 
     # -------------------------------------------------------------------------
     # Tick Update (Called once per second by UI/Timer thread)
@@ -366,11 +447,16 @@ class PomodoroEngine:
         Calculates exact remaining time from target monotonic clock.
         Ensures drift-free accuracy across sleep/delays.
         """
+        now_wall = datetime.now()
+        # Midnight rollover reset
+        if now_wall.date() != self._current_day:
+            self._current_day = now_wall.date()
+            self.completed_cycles_today = 0
+
         if not self.state.is_running:
             return
 
         now_mono = time.monotonic()
-        now_wall = datetime.now()
         wall_delta = (now_wall - self._last_tick_wall).total_seconds()
         mono_delta = now_mono - self._last_tick_monotonic
 

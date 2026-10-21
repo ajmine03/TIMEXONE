@@ -50,10 +50,17 @@ class TaskManager:
 
         clean_due = due_date.strip() if due_date and due_date.strip() else None
         if clean_due:
-            # Validate ISO date format YYYY-MM-DD
-            try:
-                datetime.strptime(clean_due, "%Y-%m-%d")
-            except ValueError:
+            # Validate ISO date format YYYY-MM-DD (or with optional time)
+            valid = False
+            base_str = clean_due.split(".")[0]
+            for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M"):
+                try:
+                    datetime.strptime(base_str, fmt)
+                    valid = True
+                    break
+                except ValueError:
+                    pass
+            if not valid:
                 raise ValueError("Due date must be in YYYY-MM-DD format.")
 
         task = self.repo.create_task(
@@ -87,11 +94,19 @@ class TaskManager:
             kwargs["status"] = clean_s
 
         if "due_date" in kwargs and kwargs["due_date"]:
-            try:
-                datetime.strptime(kwargs["due_date"].strip(), "%Y-%m-%d")
-                kwargs["due_date"] = kwargs["due_date"].strip()
-            except ValueError:
+            raw_due = kwargs["due_date"].strip()
+            base_str = raw_due.split(".")[0]
+            valid = False
+            for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M"):
+                try:
+                    datetime.strptime(base_str, fmt)
+                    valid = True
+                    break
+                except ValueError:
+                    pass
+            if not valid:
                 raise ValueError("Due date must be in YYYY-MM-DD format.")
+            kwargs["due_date"] = raw_due
 
         updated = self.repo.update_task(task_id, **kwargs)
         if updated:

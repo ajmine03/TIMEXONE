@@ -7,7 +7,7 @@ import json
 import uuid
 from dataclasses import dataclass, asdict
 from datetime import datetime, date, timedelta
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple, Set
 
 from focusflow.db.database import Database
 from focusflow.config import DEFAULT_PREFERENCES
@@ -235,6 +235,23 @@ class Repository:
                 (new_count, new_seconds, now, task_id),
             )
 
+    def record_task_focus_time(self, task_id: str, duration_seconds: int):
+        """Add to total focus seconds without incrementing completed pomodoros count."""
+        task = self.get_task(task_id)
+        if not task or duration_seconds <= 0:
+            return
+        new_seconds = task.total_focus_seconds + duration_seconds
+        now = datetime.now().isoformat()
+        with self.db.transaction():
+            self.db.execute(
+                """
+                UPDATE tasks
+                SET total_focus_seconds = ?, updated_at = ?
+                WHERE id = ?;
+                """,
+                (new_seconds, now, task_id),
+            )
+
     # -------------------------------------------------------------------------
     # Pomodoro Session Operations
     # -------------------------------------------------------------------------
@@ -287,9 +304,12 @@ class Repository:
                 interruptions=interruption_inc,
             )
 
-            # If associated with a task and completed, increment task's pomodoro count
-            if task_id and status == "completed":
-                self.record_task_pomodoro(task_id, duration_seconds)
+            # If associated with a task:
+            if task_id:
+                if status == "completed":
+                    self.record_task_pomodoro(task_id, duration_seconds)
+                elif duration_seconds >= 15:
+                    self.record_task_focus_time(task_id, duration_seconds)
 
         return session
 
@@ -322,6 +342,75 @@ class Repository:
 
         cursor = self.db.execute(query, tuple(params))
         return [PomodoroSession(**dict(row)) for row in cursor.fetchall()]
+
+    def get_dates_with_sessions(self, year: int, month: int) -> set:
+        """Return a set of day numbers (1-31) in the given year/month that have recorded sessions."""
+        prefix = f"{year:04d}-{month:02d}-%"
+        cursor = self.db.execute(
+            "SELECT DISTINCT date FROM pomodoro_sessions WHERE date LIKE ?;",
+            (prefix,),
+        )
+        days = set()
+        for row in cursor.fetchall():
+            try:
+                d = int(row["date"].split("-")[2])
+                days.add(d)
+            except Exception:
+                pass
+        return days
+
+    def get_task_completion_breakdown(self) -> Dict[str, int]:
+        """Return counts of completed, pending, and overdue tasks."""
+        today_str = date.today().isoformat()
+        cursor = self.db.execute(
+            """
+            SELECT
+                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_count,
+                SUM(CASE WHEN status != 'completed' AND (due_date IS NULL OR due_date >= ?) THEN 1 ELSE 0 END) as pending_count,
+                SUM(CASE WHEN status != 'completed' AND due_date IS NOT NULL AND due_date < ? THEN 1 ELSE 0 END) as overdue_count
+            FROM tasks;
+            """,
+            (today_str, today_str),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return {"completed": 0, "pending": 0, "overdue": 0}
+        return {
+            "completed": row["completed_count"] or 0,
+            "pending": row["pending_count"] or 0,
+            "overdue": row["overdue_count"] or 0,
+        }
+
+    def get_week_focus_data(self, target_date: Optional[date] = None) -> List[Tuple[str, float]]:
+        """Return [('Mon', hours), ..., ('Sun', hours)] for the week containing target_date."""
+        ref = target_date or date.today()
+        start_of_week = ref - timedelta(days=ref.weekday())
+        end_of_week = start_of_week + timedelta(days=6)
+
+        stats_range = self.get_stats_range(start_of_week.isoformat(), end_of_week.isoformat())
+        days_map = {s.date: round(s.total_focus_seconds / 3600.0, 2) for s in stats_range}
+
+        day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        result = []
+        for i in range(7):
+            d_str = (start_of_week + timedelta(days=i)).isoformat()
+            result.append((day_names[i], days_map.get(d_str, 0.0)))
+        return result
+
+    def get_weekly_productivity_pct(self, target_date: Optional[date] = None) -> int:
+        """Calculate productivity % for the current week against target daily goal."""
+        ref = target_date or date.today()
+        start_of_week = ref - timedelta(days=ref.weekday())
+        days_elapsed = ref.weekday() + 1
+        stats_range = self.get_stats_range(start_of_week.isoformat(), ref.isoformat())
+        total_focus = sum(s.total_focus_seconds for s in stats_range)
+
+        goal_per_day = int(self.get_preference("daily_goal_seconds", 7200))
+        target_so_far = goal_per_day * days_elapsed
+        if target_so_far <= 0:
+            return 78
+        pct = int(min(100.0, max(0.0, (total_focus / target_so_far) * 100.0)))
+        return pct if total_focus > 0 else 0
 
     # -------------------------------------------------------------------------
     # Daily Statistics Operations

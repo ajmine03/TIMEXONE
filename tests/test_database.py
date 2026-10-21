@@ -112,6 +112,38 @@ class TestDatabase(unittest.TestCase):
         self.repo.set_preference("auto_start_breaks", False)
         self.assertFalse(self.repo.get_preference("auto_start_breaks"))
 
+    def test_task_completion_breakdown(self):
+        # 1 completed, 1 pending, 1 overdue
+        t1 = self.repo.create_task("T1")
+        self.repo.update_task(t1.id, status="completed")
+
+        t2 = self.repo.create_task("T2", due_date=date.today().isoformat())
+
+        overdue_date = (date.today() - timedelta(days=3)).isoformat()
+        t3 = self.repo.create_task("T3", due_date=overdue_date)
+
+        breakdown = self.repo.get_task_completion_breakdown()
+        self.assertEqual(breakdown["completed"], 1)
+        self.assertEqual(breakdown["pending"], 1)
+        self.assertEqual(breakdown["overdue"], 1)
+
+    def test_week_focus_data_and_productivity(self):
+        week_data = self.repo.get_week_focus_data()
+        self.assertEqual(len(week_data), 7)
+        # Should be list of (day_name, hours)
+        self.assertEqual(week_data[0][0], "Mon")
+
+        prod_pct = self.repo.get_weekly_productivity_pct()
+        self.assertTrue(0 <= prod_pct <= 100)
+
+    def test_dates_with_sessions(self):
+        now = datetime.now().isoformat()
+        self.repo.record_session(None, "focus", now, now, 1500, "completed")
+        today = date.today()
+        dates = self.repo.get_dates_with_sessions(today.year, today.month)
+        self.assertIn(today.day, dates)
+
 
 if __name__ == "__main__":
     unittest.main()
+

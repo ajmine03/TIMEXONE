@@ -201,6 +201,7 @@ class FocusFlowApp:
                 self.notify.notify_break_completed()
             elif play_sound:
                 self.sound.play_chime()
+            self.main_window.dashboard_view.refresh_dashboard()
 
     def run(self, start_minimized: bool = False, floating_only: bool = False):
         """Launch the application windows."""

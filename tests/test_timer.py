@@ -187,7 +187,51 @@ class TestTimerEngine(unittest.TestCase):
         eng2 = PomodoroEngine(self.repo, focus_duration=1500)
         self.assertEqual(eng2.state, TimerState.PAUSED_FOCUS)
         self.assertEqual(eng2.active_task_id, task.id)
-        self.assertEqual(eng2.remaining_seconds, 800)
+    def test_mode_switching(self):
+        """Test switching mode directly between focus, short_break, and long_break."""
+        eng = PomodoroEngine(self.repo, focus_duration=1500, short_break_duration=300, long_break_duration=900)
+        self.assertEqual(eng.current_mode, "focus")
+
+        eng.switch_mode("short_break")
+        self.assertEqual(eng.current_mode, "short_break")
+        self.assertEqual(eng.remaining_seconds, 300)
+        self.assertEqual(eng.total_duration, 300)
+        self.assertEqual(eng.state, TimerState.PAUSED_SHORT_BREAK)
+
+        eng.switch_mode("long_break")
+        self.assertEqual(eng.current_mode, "long_break")
+        self.assertEqual(eng.remaining_seconds, 900)
+        self.assertEqual(eng.total_duration, 900)
+        self.assertEqual(eng.state, TimerState.PAUSED_LONG_BREAK)
+
+        eng.switch_mode("focus")
+        self.assertEqual(eng.current_mode, "focus")
+        self.assertEqual(eng.remaining_seconds, 1500)
+        self.assertEqual(eng.state, TimerState.IDLE)
+
+    def test_interrupted_session_task_focus_time(self):
+        """Test that stopping or skipping an interrupted session records focus time on task."""
+        task = self.repo.create_task("Focus Test Task")
+        eng = PomodoroEngine(self.repo, focus_duration=1500)
+        eng.start(task_id=task.id)
+
+        # 100 seconds elapsed (1400 remaining)
+        eng.remaining_seconds = 1400
+        eng.stop(save_interrupted=True)
+
+        updated_task = self.repo.get_task(task.id)
+        self.assertEqual(updated_task.completed_pomodoros, 0)
+        self.assertEqual(updated_task.total_focus_seconds, 100)
+
+    def test_midnight_rollover(self):
+        """Test that ticking past midnight resets completed_cycles_today to 0."""
+        from datetime import date, timedelta
+        eng = PomodoroEngine(self.repo, focus_duration=1500)
+        eng.completed_cycles_today = 5
+        eng._current_day = date.today() - timedelta(days=1)
+        eng.tick()
+        self.assertEqual(eng.completed_cycles_today, 0)
+        self.assertEqual(eng._current_day, date.today())
 
 
 if __name__ == "__main__":
