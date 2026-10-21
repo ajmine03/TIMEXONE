@@ -1,3 +1,20 @@
+focusflow (0.3.0-1) unstable; urgency=medium
+
+  * FocusFlow v0.3.0 major UI redesign and bugfix release:
+    - Complete dark-glass dashboard redesign matching target reference.
+    - Mountain sunset panorama hero banner with 4 real-data stat cards.
+    - Multicolor circular timer display with Pomodoro, Short Break, and Long Break switcher.
+    - Interactive monthly calendar card with database session indicator dots.
+    - Donut task completion chart and 7-day purple gradient focus time bar chart.
+    - Redesigned floating timer with fluid gradient waves, header dragging, and vector pushpin.
+    - Redesigned task selection dialog (NoTaskDialog) with dark glass cards.
+    - Midnight rollover bug fix automatically resetting completed pomodoro cycles.
+    - Interrupted task focus time tracking on stopped/skipped sessions.
+    - Fixed monotonic clock timer drift and suspend/resume handling.
+    - Offline bundled local vector artwork (assets/tomato.svg, assets/hero_sunset.png).
+
+ -- FocusFlow Contributors <focusflow@localhost>  Wed, 21 Oct 2026 18:50:00 +0000
+
 focusflow (0.2.0-1) unstable; urgency=medium
 
   * FocusFlow v0.2.0 daily-driver release:
