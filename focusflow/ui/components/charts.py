@@ -21,13 +21,32 @@ class WeeklyBarChart(QWidget):
             ("Fri", 3.2), ("Sat", 1.8), ("Sun", 0.8)
         ]
         self.max_scale_hours = 4.0
+        self.y_steps = [0, 1, 2, 3, 4]
         self.setMinimumHeight(150)
 
     def set_data(self, data: List[Tuple[str, float]]):
         self.data = data
-        # Dynamically scale max if exceeds 4h
-        max_val = max([val for _, val in self.data] + [4.0])
-        self.max_scale_hours = max(4.0, max_val)
+        max_val = max([val for _, val in self.data] + [0.0])
+        if max_val <= 0.0:
+            self.max_scale_hours = 4.0
+            self.y_steps = [0, 1, 2, 3, 4]
+        elif max_val <= 1.0:
+            self.max_scale_hours = 1.0
+            self.y_steps = [0, 0.5, 1.0]
+        elif max_val <= 2.0:
+            self.max_scale_hours = 2.0
+            self.y_steps = [0, 1, 2]
+        elif max_val <= 4.0:
+            self.max_scale_hours = 4.0
+            self.y_steps = [0, 1, 2, 3, 4]
+        else:
+            import math
+            ceil_val = int(math.ceil(max_val))
+            self.max_scale_hours = float(ceil_val)
+            step = max(1, ceil_val // 4)
+            self.y_steps = list(range(0, ceil_val + 1, step))
+            if ceil_val not in self.y_steps:
+                self.y_steps.append(ceil_val)
         self.update()
 
     def paintEvent(self, event):
@@ -45,24 +64,31 @@ class WeeklyBarChart(QWidget):
         chart_w = w - padding_left - padding_right
         chart_h = h - padding_top - padding_bottom
 
-        # 1. Y-Axis Grid Lines & Labels (0h, 1h, 2h, 3h, 4h)
+        # 1. Y-Axis Grid Lines & Labels
         grid_pen = QPen(QColor(36, 46, 74, 90), 1, Qt.PenStyle.DashLine)
         label_font = QFont("Inter", 9, QFont.Weight.Medium)
         painter.setFont(label_font)
 
-        y_steps = [0, 1, 2, 3, 4]
-        for step in y_steps:
+        for step in self.y_steps:
             if step > self.max_scale_hours:
                 continue
             y_pos = padding_top + chart_h - (step / self.max_scale_hours) * chart_h
 
             # Label
+            lbl_str = f"{int(step)}h" if step == int(step) else f"{step}h"
             painter.setPen(QColor("#64748b"))
-            painter.drawText(QRectF(0, y_pos - 8, padding_left - 8, 16), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, f"{step}h")
+            painter.drawText(QRectF(0, y_pos - 8, padding_left - 8, 16), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, lbl_str)
 
             # Line
             painter.setPen(grid_pen)
             painter.drawLine(int(padding_left), int(y_pos), int(w - padding_right), int(y_pos))
+
+        # Check for empty dataset
+        total_hours = sum(val for _, val in self.data)
+        if total_hours <= 0.001 and len(self.data) > 0:
+            painter.setPen(QColor("#64748b"))
+            painter.setFont(QFont("Inter", 11, QFont.Weight.Normal))
+            painter.drawText(QRectF(padding_left, padding_top, chart_w, chart_h - 10), Qt.AlignmentFlag.AlignCenter, "No focus sessions recorded for this period")
 
         # 2. Render Bars
         n_bars = len(self.data)
@@ -73,20 +99,26 @@ class WeeklyBarChart(QWidget):
             slot_center = padding_left + (idx + 0.5) * slot_w
             bar_x = slot_center - (bar_w / 2.0)
 
-            frac = min(1.0, max(0.0, val / self.max_scale_hours))
-            bar_height = frac * chart_h
-
-            bar_y = padding_top + chart_h - bar_height
-            bar_rect = QRectF(bar_x, bar_y, bar_w, max(4.0, bar_height))
-
-            # Purple/Violet gradient (#a855f7 to #6366f1)
-            grad = QLinearGradient(bar_rect.topLeft(), bar_rect.bottomLeft())
-            grad.setColorAt(0.0, QColor("#a855f7"))
-            grad.setColorAt(1.0, QColor("#6366f1"))
-
-            painter.setBrush(grad)
+            # Slot background / track (subtle rounded slot background matching Image 4)
+            track_rect = QRectF(bar_x, padding_top, bar_w, chart_h)
+            painter.setBrush(QColor(24, 32, 50, 75))
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawRoundedRect(bar_rect, 6, 6)
+            painter.drawRoundedRect(track_rect, 6, 6)
+
+            if val > 0.001:
+                frac = min(1.0, max(0.0, val / self.max_scale_hours))
+                bar_height = max(6.0, frac * chart_h)
+                bar_y = padding_top + chart_h - bar_height
+                bar_rect = QRectF(bar_x, bar_y, bar_w, bar_height)
+
+                # Purple/Violet gradient (#a855f7 to #6366f1)
+                grad = QLinearGradient(bar_rect.topLeft(), bar_rect.bottomLeft())
+                grad.setColorAt(0.0, QColor("#a855f7"))
+                grad.setColorAt(1.0, QColor("#6366f1"))
+
+                painter.setBrush(grad)
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.drawRoundedRect(bar_rect, 6, 6)
 
             # Day Label
             painter.setPen(QColor("#8a95af"))
@@ -121,18 +153,18 @@ class TaskCompletionDonutChart(QWidget):
         h = self.height()
 
         total = self.completed + self.pending + self.overdue
-        pct = int((self.completed / total * 100.0) if total > 0 else 0)
+        pct = int(round((self.completed / total * 100.0))) if total > 0 else 0
 
         # Donut dimensions (placed on left side)
         donut_size = min(h - 20, 120)
-        cx = 20 + donut_size / 2.0
+        cx = 24 + donut_size / 2.0
         cy = h / 2.0
         radius = donut_size / 2.0
-        thickness = 12.0
+        thickness = 13.0
         rect = QRectF(cx - radius, cy - radius, donut_size, donut_size)
 
         # 1. Base track
-        track_pen = QPen(QColor(24, 32, 52), thickness, Qt.PenStyle.SolidLine)
+        track_pen = QPen(QColor(22, 28, 44), thickness, Qt.PenStyle.SolidLine)
         painter.setPen(track_pen)
         painter.drawEllipse(rect)
 
@@ -155,16 +187,26 @@ class TaskCompletionDonutChart(QWidget):
                 start_angle += span
 
         # 3. Center percentage text
-        painter.setPen(QColor("#ffffff"))
-        painter.setFont(QFont("Inter", 15, QFont.Weight.Bold))
-        painter.drawText(QRectF(cx - 35, cy - 14, 70, 20), Qt.AlignmentFlag.AlignCenter, f"{pct}%")
+        if total > 0:
+            painter.setPen(QColor("#ffffff"))
+            painter.setFont(QFont("Inter", 16, QFont.Weight.Bold))
+            painter.drawText(QRectF(cx - 35, cy - 15, 70, 22), Qt.AlignmentFlag.AlignCenter, f"{pct}%")
 
-        painter.setPen(QColor("#8a95af"))
-        painter.setFont(QFont("Inter", 9, QFont.Weight.Medium))
-        painter.drawText(QRectF(cx - 35, cy + 6, 70, 16), Qt.AlignmentFlag.AlignCenter, "Completed")
+            painter.setPen(QColor("#8a95af"))
+            painter.setFont(QFont("Inter", 9, QFont.Weight.Medium))
+            painter.drawText(QRectF(cx - 35, cy + 6, 70, 16), Qt.AlignmentFlag.AlignCenter, "Completed")
+        else:
+            painter.setPen(QColor("#ffffff"))
+            painter.setFont(QFont("Inter", 15, QFont.Weight.Bold))
+            painter.drawText(QRectF(cx - 35, cy - 14, 70, 20), Qt.AlignmentFlag.AlignCenter, "0%")
+
+            painter.setPen(QColor("#64748b"))
+            painter.setFont(QFont("Inter", 9, QFont.Weight.Medium))
+            painter.drawText(QRectF(cx - 35, cy + 6, 70, 16), Qt.AlignmentFlag.AlignCenter, "No Tasks")
 
         # 4. Legend on right side
-        leg_x = cx + radius + 28
+        leg_x = cx + radius + 24
+        leg_w = w - leg_x - 16
         leg_items = [
             ("Completed", self.completed, QColor("#10b981")),
             ("Pending", self.pending, QColor("#3b82f6")),
@@ -183,12 +225,12 @@ class TaskCompletionDonutChart(QWidget):
             # Label
             painter.setPen(QColor("#a0aec0"))
             painter.setFont(QFont("Inter", 11, QFont.Weight.Normal))
-            painter.drawText(QRectF(leg_x + 14, y, 90, 18), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, label)
+            painter.drawText(QRectF(leg_x + 14, y, 80, 18), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, label)
 
             # Count
             painter.setPen(QColor("#ffffff"))
             painter.setFont(QFont("Inter", 11, QFont.Weight.Bold))
-            painter.drawText(QRectF(w - 40, y, 30, 18), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, str(count))
+            painter.drawText(QRectF(leg_x + 14, y, leg_w - 14, 18), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, str(count))
 
         painter.end()
 

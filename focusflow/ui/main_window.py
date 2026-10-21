@@ -241,7 +241,7 @@ class MainWindow(QMainWindow):
             ("dashboard", "🏠  Dashboard", 0),
             ("tasks", "☑  Tasks", 1),
             ("timer", "⏰  Timer", 0),
-            ("analytics", "📊  Analytics", 3),
+            ("analytics", "📊  Analytics", 2),
             ("calendar", "📅  Calendar", 0),
             ("settings", "⚙  Settings", 4),
         ]
@@ -489,7 +489,7 @@ class MainWindow(QMainWindow):
         self.activateWindow()
 
     def show_history(self):
-        self._on_nav_clicked(2, "history")
+        self._on_nav_clicked(2, "analytics")
         self.show()
         self.raise_()
         self.activateWindow()

@@ -47,9 +47,13 @@ QPushButton#NavButton:hover {
 }
 
 QPushButton#NavButton:checked {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #3b4bf6, stop:1 #6366f1);
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #1e2642, stop:1 #131929);
     color: #ffffff;
     font-weight: bold;
+    border-left: 3.5px solid #60a5fa;
+    border-top: none;
+    border-right: none;
+    border-bottom: none;
 }
 
 /* Badges inside Sidebar or Cards */
@@ -291,9 +295,13 @@ QPushButton#NavButton:hover {
 }
 
 QPushButton#NavButton:checked {
-    background-color: #2563eb;
-    color: #ffffff;
+    background-color: #e2e8f0;
+    color: #0f172a;
     font-weight: bold;
+    border-left: 3.5px solid #2563eb;
+    border-top: none;
+    border-right: none;
+    border-bottom: none;
 }
 
 QFrame#ContentPane {

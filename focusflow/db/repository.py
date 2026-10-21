@@ -397,6 +397,35 @@ class Repository:
             result.append((day_names[i], days_map.get(d_str, 0.0)))
         return result
 
+    def get_last_7_days_focus_data(self) -> List[Tuple[str, float]]:
+        """Return [('Day', hours), ...] for the last 7 consecutive days ending today."""
+        today = date.today()
+        start_date = today - timedelta(days=6)
+        stats_range = self.get_stats_range(start_date.isoformat(), today.isoformat())
+        days_map = {s.date: round(s.total_focus_seconds / 3600.0, 2) for s in stats_range}
+
+        day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        result = []
+        for i in range(7):
+            cur_date = start_date + timedelta(days=i)
+            day_label = day_names[cur_date.weekday()]
+            result.append((day_label, days_map.get(cur_date.isoformat(), 0.0)))
+        return result
+
+    def get_last_30_days_focus_data(self) -> List[Tuple[str, float]]:
+        """Return 4-week aggregated bins [('W1', hours), ('W2', hours), ('W3', hours), ('W4', hours)] for past 30 days."""
+        today = date.today()
+        start_date = today - timedelta(days=28)
+        stats_range = self.get_stats_range(start_date.isoformat(), today.isoformat())
+        days_map = {s.date: s.total_focus_seconds for s in stats_range}
+
+        result = []
+        for w in range(4):
+            w_start = start_date + timedelta(days=w * 7)
+            total_sec = sum(days_map.get((w_start + timedelta(days=d)).isoformat(), 0) for d in range(7))
+            result.append((f"W{w+1}", round(total_sec / 3600.0, 2)))
+        return result
+
     def get_weekly_productivity_pct(self, target_date: Optional[date] = None) -> int:
         """Calculate productivity % for the current week against target daily goal."""
         ref = target_date or date.today()

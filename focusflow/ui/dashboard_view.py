@@ -235,7 +235,7 @@ class StatCard(QFrame):
         self._init_ui(icon_type, icon_color, icon_bg, title, subtitle)
 
     def _init_ui(self, icon_type: str, icon_color: str, icon_bg: str, title: str, subtitle: str):
-        self.setMinimumHeight(56)
+        self.setFixedHeight(58)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(10, 6, 10, 6)
         layout.setSpacing(8)
@@ -251,15 +251,15 @@ class StatCard(QFrame):
         text_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         self.val_lbl = QLabel("0", self)
-        self.val_lbl.setStyleSheet("font-size: 16px; font-weight: bold; color: #ffffff;")
+        self.val_lbl.setStyleSheet("font-size: 15px; font-weight: bold; color: #ffffff; border: none; background: transparent;")
         text_layout.addWidget(self.val_lbl)
 
         self.title_lbl = QLabel(title, self)
-        self.title_lbl.setStyleSheet("font-size: 11px; color: #e2e8f0; font-weight: 600;")
+        self.title_lbl.setStyleSheet("font-size: 11px; color: #e2e8f0; font-weight: 600; border: none; background: transparent;")
         text_layout.addWidget(self.title_lbl)
 
         self.sub_lbl = QLabel(subtitle, self)
-        self.sub_lbl.setStyleSheet("font-size: 10px; color: #94a3b8; font-weight: normal;")
+        self.sub_lbl.setStyleSheet("font-size: 9.5px; color: #94a3b8; font-weight: normal; border: none; background: transparent;")
         text_layout.addWidget(self.sub_lbl)
 
         layout.addLayout(text_layout, stretch=1)
@@ -287,19 +287,19 @@ class TodayTaskRow(QFrame):
         self.setStyleSheet("""
             QFrame {
                 background-color: transparent;
-                border: none;
-                border-radius: 8px;
+                border-bottom: 1px solid #141b2c;
+                border-radius: 6px;
             }
             QFrame:hover {
-                background-color: #161c2d;
+                background-color: #141c2e;
             }
         """)
         self._init_ui()
 
     def _init_ui(self):
-        self.setFixedHeight(34)
+        self.setFixedHeight(40)
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 4, 8, 4)
+        layout.setContentsMargins(10, 6, 10, 6)
         layout.setSpacing(10)
 
         # 1. Custom Checkbox button
@@ -312,11 +312,11 @@ class TodayTaskRow(QFrame):
         # 2. Title
         self.lbl_title = QLabel(self.task.title, self)
         if self.task.status == "completed":
-            self.lbl_title.setStyleSheet("color: #64748b; text-decoration: line-through; font-size: 13px;")
+            self.lbl_title.setStyleSheet("color: #64748b; text-decoration: line-through; font-size: 13px; border: none; background: transparent;")
         elif self.is_active:
-            self.lbl_title.setStyleSheet("color: #60a5fa; font-weight: 600; font-size: 13px;")
+            self.lbl_title.setStyleSheet("color: #60a5fa; font-weight: 600; font-size: 13px; border: none; background: transparent;")
         else:
-            self.lbl_title.setStyleSheet("color: #ffffff; font-size: 13px; font-weight: 500;")
+            self.lbl_title.setStyleSheet("color: #ffffff; font-size: 13px; font-weight: 500; border: none; background: transparent;")
         layout.addWidget(self.lbl_title, stretch=1)
 
         # 3. Priority badge
@@ -332,9 +332,10 @@ class TodayTaskRow(QFrame):
                 color: {text_c};
                 background-color: {bg_c};
                 border-radius: 6px;
-                padding: 2px 8px;
+                padding: 3px 8px;
                 font-size: 11px;
                 font-weight: bold;
+                border: none;
             }}
         """)
         layout.addWidget(lbl_pri)
@@ -585,37 +586,52 @@ class DashboardView(QWidget):
         timer_layout.setSpacing(10)
         timer_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # Top Mode Switcher Pills: [Pomodoro] [Short Break] [Long Break] + Gear
+        # Top Mode Switcher: Connected Rounded Segmented Capsule + Gear
         mode_row = QHBoxLayout()
-        mode_row.setSpacing(6)
+        mode_row.setContentsMargins(0, 0, 0, 0)
+        mode_row.setSpacing(8)
 
-        self.btn_mode_pomo = QPushButton("Pomodoro", self.timer_card)
-        self.btn_mode_pomo.setProperty("class", "Pill")
+        self.mode_capsule = QFrame(self.timer_card)
+        self.mode_capsule.setStyleSheet("""
+            QFrame {
+                background-color: #0c101d;
+                border: 1px solid #1c263d;
+                border-radius: 17px;
+                padding: 2px;
+            }
+        """)
+        capsule_layout = QHBoxLayout(self.mode_capsule)
+        capsule_layout.setContentsMargins(3, 2, 3, 2)
+        capsule_layout.setSpacing(2)
+
+        self.btn_mode_pomo = QPushButton("Pomodoro", self.mode_capsule)
         self.btn_mode_pomo.setCheckable(True)
         self.btn_mode_pomo.setChecked(True)
         self.btn_mode_pomo.clicked.connect(lambda: self._on_mode_switched("focus"))
-        mode_row.addWidget(self.btn_mode_pomo)
+        capsule_layout.addWidget(self.btn_mode_pomo)
 
-        self.btn_mode_short = QPushButton("Short Break", self.timer_card)
-        self.btn_mode_short.setProperty("class", "Pill")
+        self.btn_mode_short = QPushButton("Short Break", self.mode_capsule)
         self.btn_mode_short.setCheckable(True)
         self.btn_mode_short.clicked.connect(lambda: self._on_mode_switched("short_break"))
-        mode_row.addWidget(self.btn_mode_short)
+        capsule_layout.addWidget(self.btn_mode_short)
 
-        self.btn_mode_long = QPushButton("Long Break", self.timer_card)
-        self.btn_mode_long.setProperty("class", "Pill")
+        self.btn_mode_long = QPushButton("Long Break", self.mode_capsule)
         self.btn_mode_long.setCheckable(True)
         self.btn_mode_long.clicked.connect(lambda: self._on_mode_switched("long_break"))
-        mode_row.addWidget(self.btn_mode_long)
+        capsule_layout.addWidget(self.btn_mode_long)
+
+        self._update_segmented_buttons_style()
+        mode_row.addWidget(self.mode_capsule)
+        mode_row.addStretch()
 
         btn_gear = QPushButton("⚙", self.timer_card)
-        btn_gear.setFixedSize(26, 26)
+        btn_gear.setFixedSize(28, 28)
         btn_gear.setStyleSheet("""
             QPushButton {
                 background: transparent;
                 color: #8a95af;
                 border: none;
-                font-size: 14px;
+                font-size: 15px;
             }
             QPushButton:hover {
                 color: #ffffff;
@@ -632,18 +648,18 @@ class DashboardView(QWidget):
 
         # Start / Pause Glowing Pill Button
         self.btn_play_pause = QPushButton("▶  Start", self.timer_card)
-        self.btn_play_pause.setMinimumSize(170, 42)
+        self.btn_play_pause.setMinimumSize(190, 44)
         self.btn_play_pause.setStyleSheet("""
             QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #6366f1, stop:1 #8b5cf6);
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4f46e5, stop:0.5 #6366f1, stop:1 #8b5cf6);
                 color: #ffffff;
                 border: none;
-                border-radius: 21px;
+                border-radius: 22px;
                 font-size: 14px;
                 font-weight: bold;
             }
             QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4f46e5, stop:1 #7c3aed);
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4338ca, stop:0.5 #4f46e5, stop:1 #7c3aed);
             }
         """)
         self.btn_play_pause.clicked.connect(self._on_play_pause_clicked)
@@ -651,7 +667,7 @@ class DashboardView(QWidget):
 
         # Secondary row: Sound toggle, Restart, Stop, More menu
         sec_row = QHBoxLayout()
-        sec_row.setSpacing(10)
+        sec_row.setSpacing(12)
         sec_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         sec_btn_style = """
@@ -659,7 +675,7 @@ class DashboardView(QWidget):
                 background-color: #1a2236;
                 color: #ffffff;
                 border: 1px solid #283553;
-                border-radius: 16px;
+                border-radius: 17px;
                 font-size: 13px;
                 font-weight: bold;
                 padding: 0px;
@@ -673,7 +689,7 @@ class DashboardView(QWidget):
         """
 
         self.btn_sound = QPushButton("♫", self.timer_card)
-        self.btn_sound.setFixedSize(36, 32)
+        self.btn_sound.setFixedSize(34, 34)
         self.btn_sound.setStyleSheet(sec_btn_style)
         self.btn_sound.setToolTip("Toggle Sound Chime")
         self.btn_sound.clicked.connect(self._toggle_sound)
@@ -681,21 +697,21 @@ class DashboardView(QWidget):
         sec_row.addWidget(self.btn_sound)
 
         self.btn_restart = QPushButton("↺", self.timer_card)
-        self.btn_restart.setFixedSize(36, 32)
+        self.btn_restart.setFixedSize(34, 34)
         self.btn_restart.setStyleSheet(sec_btn_style)
         self.btn_restart.setToolTip("Restart Session")
         self.btn_restart.clicked.connect(self.engine.restart)
         sec_row.addWidget(self.btn_restart)
 
         self.btn_stop = QPushButton("■", self.timer_card)
-        self.btn_stop.setFixedSize(36, 32)
+        self.btn_stop.setFixedSize(34, 34)
         self.btn_stop.setStyleSheet(sec_btn_style)
         self.btn_stop.setToolTip("Stop Session")
         self.btn_stop.clicked.connect(self.engine.stop)
         sec_row.addWidget(self.btn_stop)
 
         btn_more = QPushButton("···", self.timer_card)
-        btn_more.setFixedSize(36, 32)
+        btn_more.setFixedSize(34, 34)
         btn_more.setStyleSheet(sec_btn_style)
         btn_more.setToolTip("Options")
         btn_more.clicked.connect(self._open_timer_options_menu)
@@ -769,6 +785,7 @@ class DashboardView(QWidget):
         filter_row.addWidget(self.btn_f_low)
         filter_row.addStretch()
 
+        self._update_task_filter_buttons()
         tasks_layout.addLayout(filter_row)
 
         # Task Items Container (Scrollable)
@@ -899,10 +916,75 @@ class DashboardView(QWidget):
     # -------------------------------------------------------------------------
     # Mode Switcher (Pomodoro, Short Break, Long Break)
     # -------------------------------------------------------------------------
+    def _update_segmented_buttons_style(self):
+        active_style = """
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4f46e5, stop:1 #6366f1);
+                color: #ffffff;
+                font-weight: bold;
+                font-size: 12px;
+                border: none;
+                border-radius: 13px;
+                padding: 4px 14px;
+            }
+        """
+        inactive_style = """
+            QPushButton {
+                background: transparent;
+                color: #8a95af;
+                font-weight: 500;
+                font-size: 12px;
+                border: none;
+                border-radius: 13px;
+                padding: 4px 14px;
+            }
+            QPushButton:hover {
+                color: #ffffff;
+                background-color: #161c2d;
+            }
+        """
+        self.btn_mode_pomo.setStyleSheet(active_style if self.btn_mode_pomo.isChecked() else inactive_style)
+        self.btn_mode_short.setStyleSheet(active_style if self.btn_mode_short.isChecked() else inactive_style)
+        self.btn_mode_long.setStyleSheet(active_style if self.btn_mode_long.isChecked() else inactive_style)
+
+    def _update_task_filter_buttons(self):
+        active_style = """
+            QPushButton {
+                background-color: #312e81;
+                color: #c7d2fe;
+                border: 1px solid #4f46e5;
+                border-radius: 12px;
+                padding: 3px 10px;
+                font-size: 11px;
+                font-weight: bold;
+            }
+        """
+        inactive_style = """
+            QPushButton {
+                background-color: #0f1523;
+                color: #8a95af;
+                border: 1px solid #1c263d;
+                border-radius: 12px;
+                padding: 3px 10px;
+                font-size: 11px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background-color: #161e31;
+                color: #ffffff;
+                border-color: #2b395b;
+            }
+        """
+        self.btn_f_all.setStyleSheet(active_style if self.active_task_filter == "all" else inactive_style)
+        self.btn_f_high.setStyleSheet(active_style if self.active_task_filter == "high" else inactive_style)
+        self.btn_f_med.setStyleSheet(active_style if self.active_task_filter == "medium" else inactive_style)
+        self.btn_f_low.setStyleSheet(active_style if self.active_task_filter == "low" else inactive_style)
+
     def _on_mode_switched(self, mode: str):
         self.btn_mode_pomo.setChecked(mode == "focus")
         self.btn_mode_short.setChecked(mode == "short_break")
         self.btn_mode_long.setChecked(mode == "long_break")
+        self._update_segmented_buttons_style()
         self.engine.switch_mode(mode)
         self._on_tick(self.engine.remaining_seconds, self.engine.total_duration, 0.0)
 
@@ -931,12 +1013,15 @@ class DashboardView(QWidget):
             self.btn_play_pause.setText("▶  Start")
             self.btn_play_pause.setStyleSheet("""
                 QPushButton {
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #6366f1, stop:1 #8b5cf6);
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4f46e5, stop:0.5 #6366f1, stop:1 #8b5cf6);
                     color: #ffffff;
                     border: none;
-                    border-radius: 21px;
+                    border-radius: 22px;
                     font-size: 14px;
                     font-weight: bold;
+                }
+                QPushButton:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4338ca, stop:0.5 #4f46e5, stop:1 #7c3aed);
                 }
             """)
         elif new_state.is_running:
@@ -946,9 +1031,12 @@ class DashboardView(QWidget):
                     background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4f46e5, stop:1 #7c3aed);
                     color: #ffffff;
                     border: none;
-                    border-radius: 21px;
+                    border-radius: 22px;
                     font-size: 14px;
                     font-weight: bold;
+                }
+                QPushButton:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4338ca, stop:1 #6d28d9);
                 }
             """)
         elif new_state.is_paused:
@@ -958,9 +1046,12 @@ class DashboardView(QWidget):
                     background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #059669, stop:1 #10b981);
                     color: #ffffff;
                     border: none;
-                    border-radius: 21px;
+                    border-radius: 22px;
                     font-size: 14px;
                     font-weight: bold;
+                }
+                QPushButton:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #047857, stop:1 #059669);
                 }
             """)
 
@@ -969,6 +1060,7 @@ class DashboardView(QWidget):
         self.btn_mode_pomo.setChecked(mode == "focus")
         self.btn_mode_short.setChecked(mode == "short_break")
         self.btn_mode_long.setChecked(mode == "long_break")
+        self._update_segmented_buttons_style()
 
         self._on_tick(self.engine.remaining_seconds, self.engine.total_duration, 0.0)
 
@@ -1019,6 +1111,7 @@ class DashboardView(QWidget):
         self.btn_f_high.setChecked(filter_key == "high")
         self.btn_f_med.setChecked(filter_key == "medium")
         self.btn_f_low.setChecked(filter_key == "low")
+        self._update_task_filter_buttons()
         self.refresh_tasks()
 
     def set_search_query(self, query: str):
@@ -1062,6 +1155,7 @@ class DashboardView(QWidget):
         self.btn_f_high.setText(f"High {n_high}")
         self.btn_f_med.setText(f"Medium {n_med}")
         self.btn_f_low.setText(f"Low {n_low}")
+        self._update_task_filter_buttons()
 
         if not tasks:
             empty = QLabel("No tasks found.")
@@ -1104,7 +1198,10 @@ class DashboardView(QWidget):
         self.refresh_analytics()
 
     def _on_date_selected(self, sel_date: date):
-        pass
+        self.chart_period_combo.blockSignals(True)
+        self.chart_period_combo.setCurrentIndex(0)  # "This Week"
+        self.chart_period_combo.blockSignals(False)
+        self.refresh_analytics(target_date=sel_date)
 
     def refresh_recent_sessions(self):
         while self.recent_list_layout.count() > 0:
@@ -1112,10 +1209,10 @@ class DashboardView(QWidget):
             if item.widget():
                 item.widget().deleteLater()
 
-        sessions = self.repo.list_sessions(limit=5)
+        sessions = self.repo.list_sessions(limit=7)
         if not sessions:
             lbl_empty = QLabel("No sessions recorded today.")
-            lbl_empty.setStyleSheet("color: #64748b; font-size: 12px; padding: 14px 0;")
+            lbl_empty.setStyleSheet("color: #64748b; font-size: 12px; padding: 14px 0; border: none; background: transparent;")
             lbl_empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.recent_list_layout.addWidget(lbl_empty)
             self.recent_list_layout.addStretch()
@@ -1123,30 +1220,41 @@ class DashboardView(QWidget):
 
         for s in sessions:
             row = QFrame()
-            row.setFixedHeight(34)
+            row.setFixedHeight(38)
+            row.setStyleSheet("""
+                QFrame {
+                    background: transparent;
+                    border-bottom: 1px solid #141b2c;
+                    border-radius: 4px;
+                }
+                QFrame:hover {
+                    background-color: #141c2e;
+                }
+            """)
             r_layout = QHBoxLayout(row)
-            r_layout.setContentsMargins(4, 2, 4, 2)
-            r_layout.setSpacing(8)
+            r_layout.setContentsMargins(6, 4, 6, 4)
+            r_layout.setSpacing(10)
 
             # Dot indicator
             dot_color = "#ef4444" if s.session_type == "focus" else ("#10b981" if s.session_type == "short_break" else "#a855f7")
             dot = QLabel()
             dot.setFixedSize(8, 8)
-            dot.setStyleSheet(f"background-color: {dot_color}; border-radius: 4px;")
+            dot.setStyleSheet(f"background-color: {dot_color}; border-radius: 4px; border: none;")
             r_layout.addWidget(dot)
 
             # Session label & duration
             text_col = QVBoxLayout()
+            text_col.setContentsMargins(0, 0, 0, 0)
             text_col.setSpacing(1)
 
             type_name = "Focus Session" if s.session_type == "focus" else ("Short Break" if s.session_type == "short_break" else "Long Break")
             lbl_name = QLabel(type_name)
-            lbl_name.setStyleSheet("color: #ffffff; font-size: 12px; font-weight: 500;")
+            lbl_name.setStyleSheet("color: #ffffff; font-size: 12px; font-weight: 500; border: none; background: transparent;")
             text_col.addWidget(lbl_name)
 
             dur_mins = max(1, s.duration_seconds // 60)
             lbl_dur = QLabel(f"{dur_mins} min")
-            lbl_dur.setStyleSheet("color: #8a95af; font-size: 10px;")
+            lbl_dur.setStyleSheet("color: #8a95af; font-size: 10px; border: none; background: transparent;")
             text_col.addWidget(lbl_dur)
 
             r_layout.addLayout(text_col, stretch=1)
@@ -1160,16 +1268,22 @@ class DashboardView(QWidget):
                 time_str = s.start_time[11:16] if len(s.start_time) >= 16 else ""
 
             lbl_time = QLabel(time_str)
-            lbl_time.setStyleSheet("color: #8a95af; font-size: 11px;")
+            lbl_time.setStyleSheet("color: #8a95af; font-size: 11px; border: none; background: transparent;")
             r_layout.addWidget(lbl_time)
 
             self.recent_list_layout.addWidget(row)
         self.recent_list_layout.addStretch()
 
-    def refresh_analytics(self):
-        # Weekly focus bar chart
-        week_data = self.repo.get_week_focus_data()
-        self.bar_chart.set_data(week_data)
+    def refresh_analytics(self, target_date: Optional[date] = None):
+        period = self.chart_period_combo.currentData() or "week"
+        if period == "7days":
+            chart_data = self.repo.get_last_7_days_focus_data()
+        elif period == "30days":
+            chart_data = self.repo.get_last_30_days_focus_data()
+        else:
+            chart_data = self.repo.get_week_focus_data(target_date)
+
+        self.bar_chart.set_data(chart_data)
 
         # Task completion donut chart
         breakdown = self.repo.get_task_completion_breakdown()
