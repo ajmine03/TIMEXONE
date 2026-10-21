@@ -31,13 +31,35 @@ from focusflow.ui.components.calendar_widget import MonthCalendarWidget
 from focusflow.ui.tasks_view import TaskEditDialog
 
 
+class DashboardCard(QFrame):
+    """
+    Elevated card container matching Image 4.
+    Guaranteed dark navy background and subtle border that always renders cleanly.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("DashboardCard")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        rect = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        painter.setBrush(QColor("#111726"))
+        painter.setPen(QPen(QColor("#1e293f"), 1.0))
+        painter.drawRoundedRect(rect, 16.0, 16.0)
+        painter.end()
+
+
 class HeroBannerCard(QFrame):
     """Custom painted Hero Banner with local mountain-at-sunset background and rounded corners."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("HeroCard")
-        self.setMinimumHeight(240)
+        self.setMinimumHeight(175)
+        self.setMaximumHeight(210)
         self._bg_pixmap = None
         if HERO_BG_PATH.exists():
             self._bg_pixmap = QPixmap(str(HERO_BG_PATH))
@@ -213,8 +235,9 @@ class StatCard(QFrame):
         self._init_ui(icon_type, icon_color, icon_bg, title, subtitle)
 
     def _init_ui(self, icon_type: str, icon_color: str, icon_bg: str, title: str, subtitle: str):
+        self.setMinimumHeight(56)
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(10, 8, 10, 8)
+        layout.setContentsMargins(10, 6, 10, 6)
         layout.setSpacing(8)
 
         # Left: Icon square
@@ -223,11 +246,12 @@ class StatCard(QFrame):
 
         # Right: Value + Title + Subtitle
         text_layout = QVBoxLayout()
+        text_layout.setContentsMargins(0, 0, 0, 0)
         text_layout.setSpacing(1)
         text_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         self.val_lbl = QLabel("0", self)
-        self.val_lbl.setStyleSheet("font-size: 18px; font-weight: bold; color: #ffffff;")
+        self.val_lbl.setStyleSheet("font-size: 16px; font-weight: bold; color: #ffffff;")
         text_layout.addWidget(self.val_lbl)
 
         self.title_lbl = QLabel(title, self)
@@ -273,8 +297,9 @@ class TodayTaskRow(QFrame):
         self._init_ui()
 
     def _init_ui(self):
+        self.setFixedHeight(34)
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 6, 8, 6)
+        layout.setContentsMargins(8, 4, 8, 4)
         layout.setSpacing(10)
 
         # 1. Custom Checkbox button
@@ -426,6 +451,8 @@ class DashboardView(QWidget):
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         scroll.setStyleSheet("background: transparent; border: none;")
 
         container = QWidget()
@@ -444,13 +471,13 @@ class DashboardView(QWidget):
         # 1. Hero Section Banner
         self.hero_card = HeroBannerCard(left_col)
         hero_inner = QVBoxLayout(self.hero_card)
-        hero_inner.setContentsMargins(20, 18, 20, 18)
-        hero_inner.setSpacing(12)
+        hero_inner.setContentsMargins(18, 12, 18, 12)
+        hero_inner.setSpacing(6)
 
         # Hero Top Row: Greeting & Subtitle (Left) + Date & Focus Day Badge (Right)
         hero_top = QHBoxLayout()
         greeting_col = QVBoxLayout()
-        greeting_col.setSpacing(3)
+        greeting_col.setSpacing(2)
 
         # Dynamic greeting based on current hour
         hr = datetime.now().hour
@@ -475,7 +502,7 @@ class DashboardView(QWidget):
 
         # Right date & badge
         date_col = QVBoxLayout()
-        date_col.setSpacing(6)
+        date_col.setSpacing(4)
         date_col.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         self.lbl_hero_date = QLabel(format_date_weekday(datetime.now()), self.hero_card)
@@ -495,14 +522,12 @@ class DashboardView(QWidget):
             QFrame {
                 background-color: rgba(14, 18, 32, 0.65);
                 border: 1px solid rgba(255, 255, 255, 0.10);
-                border-radius: 10px;
-                padding: 6px 12px;
-                max-width: 280px;
+                border-radius: 8px;
             }
         """)
         q_layout = QVBoxLayout(quote_frame)
-        q_layout.setContentsMargins(8, 6, 8, 6)
-        lbl_quote = QLabel('"Discipline today\ncreates freedom tomorrow."', quote_frame)
+        q_layout.setContentsMargins(8, 3, 8, 3)
+        lbl_quote = QLabel('"Discipline today creates freedom tomorrow."', quote_frame)
         lbl_quote.setStyleSheet("font-size: 11px; color: #e2e8f0; font-style: italic;")
         q_layout.addWidget(lbl_quote)
         hero_inner.addWidget(quote_frame, alignment=Qt.AlignmentFlag.AlignLeft)
@@ -552,10 +577,9 @@ class DashboardView(QWidget):
         mid_row.setSpacing(14)
 
         # --- A. Focus Timer Card ---
-        self.timer_card = QFrame(left_col)
-        self.timer_card.setObjectName("Card")
-        self.timer_card.setProperty("class", "Card")
-        self.timer_card.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.timer_card = DashboardCard(left_col)
+        self.timer_card.setMinimumHeight(280)
+        self.timer_card.setMaximumHeight(350)
         timer_layout = QVBoxLayout(self.timer_card)
         timer_layout.setContentsMargins(18, 14, 18, 14)
         timer_layout.setSpacing(10)
@@ -625,25 +649,54 @@ class DashboardView(QWidget):
         self.btn_play_pause.clicked.connect(self._on_play_pause_clicked)
         timer_layout.addWidget(self.btn_play_pause, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # Secondary row: Sound toggle, Bell/Chime, More menu
+        # Secondary row: Sound toggle, Restart, Stop, More menu
         sec_row = QHBoxLayout()
-        sec_row.setSpacing(14)
+        sec_row.setSpacing(10)
         sec_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.btn_sound = QPushButton("🎵", self.timer_card)
-        self.btn_sound.setFixedSize(32, 28)
+        sec_btn_style = """
+            QPushButton {
+                background-color: #1a2236;
+                color: #ffffff;
+                border: 1px solid #283553;
+                border-radius: 16px;
+                font-size: 13px;
+                font-weight: bold;
+                padding: 0px;
+                margin: 0px;
+            }
+            QPushButton:hover {
+                background-color: #24304c;
+                color: #ffffff;
+                border-color: #3e507b;
+            }
+        """
+
+        self.btn_sound = QPushButton("♫", self.timer_card)
+        self.btn_sound.setFixedSize(36, 32)
+        self.btn_sound.setStyleSheet(sec_btn_style)
         self.btn_sound.setToolTip("Toggle Sound Chime")
         self.btn_sound.clicked.connect(self._toggle_sound)
         self._update_sound_icon()
         sec_row.addWidget(self.btn_sound)
 
-        btn_bell = QPushButton("🔔", self.timer_card)
-        btn_bell.setFixedSize(32, 28)
-        btn_bell.setToolTip("Notifications Enabled")
-        sec_row.addWidget(btn_bell)
+        self.btn_restart = QPushButton("↺", self.timer_card)
+        self.btn_restart.setFixedSize(36, 32)
+        self.btn_restart.setStyleSheet(sec_btn_style)
+        self.btn_restart.setToolTip("Restart Session")
+        self.btn_restart.clicked.connect(self.engine.restart)
+        sec_row.addWidget(self.btn_restart)
 
-        btn_more = QPushButton("•••", self.timer_card)
-        btn_more.setFixedSize(32, 28)
+        self.btn_stop = QPushButton("■", self.timer_card)
+        self.btn_stop.setFixedSize(36, 32)
+        self.btn_stop.setStyleSheet(sec_btn_style)
+        self.btn_stop.setToolTip("Stop Session")
+        self.btn_stop.clicked.connect(self.engine.stop)
+        sec_row.addWidget(self.btn_stop)
+
+        btn_more = QPushButton("···", self.timer_card)
+        btn_more.setFixedSize(36, 32)
+        btn_more.setStyleSheet(sec_btn_style)
         btn_more.setToolTip("Options")
         btn_more.clicked.connect(self._open_timer_options_menu)
         sec_row.addWidget(btn_more)
@@ -652,10 +705,9 @@ class DashboardView(QWidget):
         mid_row.addWidget(self.timer_card, stretch=4)
 
         # --- B. Today's Tasks Card ---
-        self.tasks_card = QFrame(left_col)
-        self.tasks_card.setObjectName("Card")
-        self.tasks_card.setProperty("class", "Card")
-        self.tasks_card.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.tasks_card = DashboardCard(left_col)
+        self.tasks_card.setMinimumHeight(280)
+        self.tasks_card.setMaximumHeight(350)
         tasks_layout = QVBoxLayout(self.tasks_card)
         tasks_layout.setContentsMargins(18, 14, 18, 14)
         tasks_layout.setSpacing(10)
@@ -736,10 +788,9 @@ class DashboardView(QWidget):
         bottom_row.setSpacing(14)
 
         # --- A. Focus Time Card ---
-        self.chart_card = QFrame(left_col)
-        self.chart_card.setObjectName("Card")
-        self.chart_card.setProperty("class", "Card")
-        self.chart_card.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.chart_card = DashboardCard(left_col)
+        self.chart_card.setMinimumHeight(180)
+        self.chart_card.setMaximumHeight(225)
         chart_layout = QVBoxLayout(self.chart_card)
         chart_layout.setContentsMargins(18, 14, 18, 14)
         chart_layout.setSpacing(8)
@@ -764,10 +815,9 @@ class DashboardView(QWidget):
         bottom_row.addWidget(self.chart_card, stretch=5)
 
         # --- B. Task Completion Card ---
-        self.donut_card = QFrame(left_col)
-        self.donut_card.setObjectName("Card")
-        self.donut_card.setProperty("class", "Card")
-        self.donut_card.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.donut_card = DashboardCard(left_col)
+        self.donut_card.setMinimumHeight(180)
+        self.donut_card.setMaximumHeight(225)
         donut_layout = QVBoxLayout(self.donut_card)
         donut_layout.setContentsMargins(18, 14, 18, 14)
         donut_layout.setSpacing(8)
@@ -793,14 +843,14 @@ class DashboardView(QWidget):
 
         # 1. Monthly Calendar
         self.calendar_card = MonthCalendarWidget(self.repo, right_col)
+        self.calendar_card.setMinimumHeight(240)
+        self.calendar_card.setMaximumHeight(290)
         self.calendar_card.date_selected.connect(self._on_date_selected)
         right_layout.addWidget(self.calendar_card)
 
         # 2. Recent Sessions Card
-        self.recent_card = QFrame(right_col)
-        self.recent_card.setObjectName("Card")
-        self.recent_card.setProperty("class", "Card")
-        self.recent_card.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.recent_card = DashboardCard(right_col)
+        self.recent_card.setMinimumHeight(220)
         recent_layout = QVBoxLayout(self.recent_card)
         recent_layout.setContentsMargins(16, 14, 16, 14)
         recent_layout.setSpacing(10)
@@ -937,7 +987,7 @@ class DashboardView(QWidget):
 
     def _update_sound_icon(self):
         enabled = self.repo.get_preference("sound_enabled", True)
-        self.btn_sound.setText("🎵" if enabled else "🔇")
+        self.btn_sound.setText("♫" if enabled else "♪̸")
 
     def _open_timer_options_menu(self):
         menu = QMenu(self)
@@ -988,19 +1038,25 @@ class DashboardView(QWidget):
             if item.widget():
                 item.widget().deleteLater()
 
-        filter_mode = "all"
-        tasks = self.task_manager.list(filter_mode=filter_mode, search=self.search_query if self.search_query else None)
+        today_iso = date.today().isoformat()
+        all_today_tasks = [t for t in self.task_manager.list(filter_mode="all", sort_by="due_date") 
+                           if t.due_date and t.due_date.startswith(today_iso)]
+        if not all_today_tasks:
+            all_today_tasks = self.task_manager.list(filter_mode="all")
+
+        tasks = all_today_tasks
+        if self.search_query:
+            tasks = [t for t in tasks if self.search_query.lower() in t.title.lower()]
 
         # Filter by priority if selected
         if self.active_task_filter != "all":
             tasks = [t for t in tasks if t.priority.lower() == self.active_task_filter]
 
         # Update button count badges
-        all_tasks = self.task_manager.list(filter_mode="all")
-        n_all = len(all_tasks)
-        n_high = sum(1 for t in all_tasks if t.priority.lower() == "high")
-        n_med = sum(1 for t in all_tasks if t.priority.lower() == "medium")
-        n_low = sum(1 for t in all_tasks if t.priority.lower() == "low")
+        n_all = len(all_today_tasks)
+        n_high = sum(1 for t in all_today_tasks if t.priority.lower() == "high")
+        n_med = sum(1 for t in all_today_tasks if t.priority.lower() == "medium")
+        n_low = sum(1 for t in all_today_tasks if t.priority.lower() == "low")
 
         self.btn_f_all.setText(f"All {n_all}")
         self.btn_f_high.setText(f"High {n_high}")
@@ -1014,7 +1070,7 @@ class DashboardView(QWidget):
             self.task_list_layout.insertWidget(0, empty)
             return
 
-        for idx, t in enumerate(tasks[:6]):  # Display top 6 in dashboard
+        for idx, t in enumerate(tasks[:5]):  # Display top 5 in dashboard matching Image 4
             is_active = (t.id == self.engine.active_task_id)
             row = TodayTaskRow(t, is_active=is_active)
             row.toggle_completed.connect(self._toggle_task_completed)
@@ -1062,12 +1118,14 @@ class DashboardView(QWidget):
             lbl_empty.setStyleSheet("color: #64748b; font-size: 12px; padding: 14px 0;")
             lbl_empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.recent_list_layout.addWidget(lbl_empty)
+            self.recent_list_layout.addStretch()
             return
 
         for s in sessions:
             row = QFrame()
+            row.setFixedHeight(34)
             r_layout = QHBoxLayout(row)
-            r_layout.setContentsMargins(4, 4, 4, 4)
+            r_layout.setContentsMargins(4, 2, 4, 2)
             r_layout.setSpacing(8)
 
             # Dot indicator
@@ -1106,6 +1164,7 @@ class DashboardView(QWidget):
             r_layout.addWidget(lbl_time)
 
             self.recent_list_layout.addWidget(row)
+        self.recent_list_layout.addStretch()
 
     def refresh_analytics(self):
         # Weekly focus bar chart

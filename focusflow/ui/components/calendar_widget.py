@@ -142,6 +142,15 @@ class MonthCalendarWidget(QFrame):
         self._init_ui()
         self.refresh_calendar()
 
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        rect = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        painter.setBrush(QColor("#111726"))
+        painter.setPen(QPen(QColor("#1e293f"), 1.0))
+        painter.drawRoundedRect(rect, 16.0, 16.0)
+        painter.end()
+
     def _init_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(14, 12, 14, 14)
