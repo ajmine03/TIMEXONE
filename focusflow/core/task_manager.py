@@ -130,6 +130,15 @@ class TaskManager:
     def get(self, task_id: str) -> Optional[Task]:
         return self.repo.get_task(task_id)
 
+    def get_task(self, task_id: str) -> Optional[Task]:
+        return self.get(task_id)
+
+    def create_task(self, *args, **kwargs) -> Task:
+        return self.create(*args, **kwargs)
+
+    def get_active_tasks(self) -> List[Task]:
+        return [t for t in self.list(filter_mode="all") if t.status != "completed"]
+
     def list(
         self,
         filter_mode: str = "all",     # 'all', 'today', 'upcoming', 'completed', 'high_priority'

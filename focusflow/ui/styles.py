@@ -3,6 +3,11 @@ Modern Linux Desktop Stylesheet and Palettes for FocusFlow.
 High-end dark productivity dashboard styling matching Image 4.
 """
 
+from focusflow.config import ASSETS_DIR
+
+_ARROW_UP = (ASSETS_DIR / "arrow_up.svg").as_posix()
+_ARROW_DOWN = (ASSETS_DIR / "arrow_down.svg").as_posix()
+
 DARK_THEME = """
 QMainWindow, QWidget#CentralWidget, QFrame#ContentPane, QScrollArea, QScrollArea > QWidget > QWidget {
     background-color: #0b0f19;
@@ -207,7 +212,8 @@ QSpinBox {
 QSpinBox::up-button {
     subcontrol-origin: border;
     subcontrol-position: top right;
-    width: 20px;
+    width: 22px;
+    height: 18px;
     border-left: 1px solid #1e263d;
     border-bottom: 1px solid #1e263d;
     border-top-right-radius: 9px;
@@ -218,10 +224,17 @@ QSpinBox::up-button:hover {
     background-color: #232c45;
 }
 
+QSpinBox::up-arrow {
+    image: url(__ARROW_UP__);
+    width: 9px;
+    height: 9px;
+}
+
 QSpinBox::down-button {
     subcontrol-origin: border;
     subcontrol-position: bottom right;
-    width: 20px;
+    width: 22px;
+    height: 18px;
     border-left: 1px solid #1e263d;
     border-bottom-right-radius: 9px;
     background-color: #161c2e;
@@ -229,6 +242,12 @@ QSpinBox::down-button {
 
 QSpinBox::down-button:hover {
     background-color: #232c45;
+}
+
+QSpinBox::down-arrow {
+    image: url(__ARROW_DOWN__);
+    width: 9px;
+    height: 9px;
 }
 
 QComboBox QAbstractItemView {
@@ -289,7 +308,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
     background: none;
     height: 0px;
 }
-"""
+""".replace("__ARROW_UP__", _ARROW_UP).replace("__ARROW_DOWN__", _ARROW_DOWN)
 
 LIGHT_THEME = """
 QWidget {
@@ -377,7 +396,7 @@ QPushButton.Danger {
     border: none;
 }
 
-QLineEdit, QTextEdit, QComboBox, QSpinBox {
+QLineEdit, QTextEdit, QComboBox {
     background-color: #ffffff;
     color: #1e293b;
     border: 1px solid #cbd5e1;
@@ -385,8 +404,58 @@ QLineEdit, QTextEdit, QComboBox, QSpinBox {
     padding: 8px 12px;
 }
 
+QSpinBox {
+    background-color: #ffffff;
+    color: #1e293b;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 8px 12px;
+    padding-right: 28px;
+}
+
 QLineEdit:focus, QTextEdit:focus, QComboBox:focus, QSpinBox:focus {
     border: 1px solid #2563eb;
+}
+
+QSpinBox::up-button {
+    subcontrol-origin: border;
+    subcontrol-position: top right;
+    width: 22px;
+    height: 18px;
+    border-left: 1px solid #cbd5e1;
+    border-bottom: 1px solid #cbd5e1;
+    border-top-right-radius: 9px;
+    background-color: #f1f5f9;
+}
+
+QSpinBox::up-button:hover {
+    background-color: #e2e8f0;
+}
+
+QSpinBox::up-arrow {
+    image: url(__ARROW_UP__);
+    width: 9px;
+    height: 9px;
+}
+
+QSpinBox::down-button {
+    subcontrol-origin: border;
+    subcontrol-position: bottom right;
+    width: 22px;
+    height: 18px;
+    border-left: 1px solid #cbd5e1;
+    border-bottom-right-radius: 9px;
+    background-color: #f1f5f9;
+}
+
+QSpinBox::down-button:hover {
+    background-color: #e2e8f0;
+}
+
+QSpinBox::down-arrow {
+    image: url(__ARROW_DOWN__);
+    width: 9px;
+    height: 9px;
 }
 
 QCheckBox::indicator {
@@ -415,4 +484,4 @@ QScrollBar::handle:vertical {
     min-height: 24px;
     border-radius: 3px;
 }
-"""
+""".replace("__ARROW_UP__", _ARROW_UP).replace("__ARROW_DOWN__", _ARROW_DOWN)

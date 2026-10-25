@@ -376,6 +376,9 @@ class TasksView(QWidget):
         self.engine.set_active_task(task_id)
         self.focus_task_requested.emit(task_id)
 
+    def refresh_tasks(self):
+        self.refresh_task_list()
+
     def refresh_task_list(self):
         # Clear existing cards except stretch
         while self.cards_layout.count() > 1:

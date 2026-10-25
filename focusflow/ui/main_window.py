@@ -26,6 +26,8 @@ from focusflow.core.task_manager import TaskManager
 from focusflow.db.repository import Repository
 from focusflow.ui.dashboard_view import DashboardView
 from focusflow.ui.tasks_view import TasksView
+from focusflow.ui.timer_view import TimerView
+from focusflow.ui.calendar_view import CalendarView
 from focusflow.ui.history_view import HistoryView
 from focusflow.ui.styles import DARK_THEME, LIGHT_THEME
 
@@ -240,10 +242,11 @@ class MainWindow(QMainWindow):
         nav_items = [
             ("dashboard", "🏠  Dashboard", 0),
             ("tasks", "☑  Tasks", 1),
-            ("timer", "⏰  Timer", 0),
+            ("timer", "⏰  Timer", 2),
             ("analytics", "📊  Analytics", 3),
-            ("calendar", "📅  Calendar", 0),
-            ("settings", "⚙  Settings", 4),
+            ("calendar", "📅  Calendar", 4),
+            ("history", "📜  History", 5),
+            ("settings", "⚙  Settings", 6),
         ]
 
         for key, label, index in nav_items:
@@ -419,21 +422,24 @@ class MainWindow(QMainWindow):
 
         self.dashboard_view = DashboardView(self.engine, self.task_manager, self.repo)
         self.tasks_view = TasksView(self.task_manager, self.engine)
+        self.timer_view = TimerView(self.engine, self.task_manager, self.repo)
+        self.stats_placeholder = QWidget()
+        self.calendar_view = CalendarView(self.repo)
         self.history_view = HistoryView(self.repo)
+        self.settings_placeholder = QWidget()
 
         self.tasks_view.focus_task_requested.connect(self._on_task_focus_requested)
         self.dashboard_view.open_settings_requested.connect(self.show_settings)
         self.dashboard_view.open_history_requested.connect(self.show_history)
         self.dashboard_view.open_tasks_requested.connect(self.show_tasks)
 
-        self.stack.addWidget(self.dashboard_view) # Index 0
-        self.stack.addWidget(self.tasks_view)      # Index 1
-        self.stack.addWidget(self.history_view)    # Index 2
-
-        self.stats_placeholder = QWidget()
-        self.settings_placeholder = QWidget()
-        self.stack.addWidget(self.stats_placeholder)    # Index 3
-        self.stack.addWidget(self.settings_placeholder) # Index 4
+        self.stack.addWidget(self.dashboard_view)        # Index 0
+        self.stack.addWidget(self.tasks_view)            # Index 1
+        self.stack.addWidget(self.timer_view)            # Index 2
+        self.stack.addWidget(self.stats_placeholder)     # Index 3
+        self.stack.addWidget(self.calendar_view)         # Index 4
+        self.stack.addWidget(self.history_view)          # Index 5
+        self.stack.addWidget(self.settings_placeholder)  # Index 6
 
         content_layout.addWidget(self.stack, stretch=1)
         root_layout.addWidget(self.content_pane, stretch=1)
@@ -466,18 +472,27 @@ class MainWindow(QMainWindow):
         for k, btn in self.nav_buttons.items():
             btn.setChecked(k == active_key)
         self.stack.setCurrentIndex(index)
-        if index == 0 and hasattr(self, "dashboard_view"):
-            self.dashboard_view.refresh_dashboard()
-        elif index == 1 and hasattr(self, "tasks_view"):
-            self.tasks_view.refresh_tasks()
-        elif index == 2 and hasattr(self, "history_view"):
-            self.history_view.refresh_history()
-        elif index == 3 and hasattr(self, "stats_view"):
-            self.stats_view.refresh_stats()
-        elif index == 4 and hasattr(self, "settings_view"):
-            self.settings_view.load_settings()
+        try:
+            if active_key == "dashboard" and hasattr(self, "dashboard_view"):
+                self.dashboard_view.refresh_dashboard()
+            elif active_key == "tasks" and hasattr(self, "tasks_view"):
+                self.tasks_view.refresh_task_list()
+            elif active_key == "timer" and hasattr(self, "timer_view"):
+                self.timer_view.refresh_timer_state()
+            elif active_key == "analytics" and hasattr(self, "stats_view"):
+                self.stats_view.refresh_stats()
+            elif active_key == "calendar" and hasattr(self, "calendar_view"):
+                self.calendar_view.refresh_calendar()
+            elif active_key == "history" and hasattr(self, "history_view"):
+                self.history_view.refresh_history()
+            elif active_key == "settings" and hasattr(self, "settings_view"):
+                self.settings_view.load_settings()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error("Error refreshing view for %s: %s", active_key, e)
 
     def _on_task_focus_requested(self, task_id: str):
+        self.engine.set_active_task(task_id)
         self._on_nav_clicked(0, "dashboard")
 
     def _refresh_task_badge(self):
@@ -498,12 +513,8 @@ class MainWindow(QMainWindow):
         self.raise_()
         self.activateWindow()
 
-    def show_history(self):
-        for btn in self.nav_buttons.values():
-            btn.setChecked(False)
-        self.stack.setCurrentIndex(2)
-        if hasattr(self, "history_view"):
-            self.history_view.refresh_history()
+    def show_timer(self):
+        self._on_nav_clicked(2, "timer")
         self.show()
         self.raise_()
         self.activateWindow()
@@ -514,8 +525,20 @@ class MainWindow(QMainWindow):
         self.raise_()
         self.activateWindow()
 
+    def show_calendar(self):
+        self._on_nav_clicked(4, "calendar")
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    def show_history(self):
+        self._on_nav_clicked(5, "history")
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
     def show_settings(self):
-        self._on_nav_clicked(4, "settings")
+        self._on_nav_clicked(6, "settings")
         self.show()
         self.raise_()
         self.activateWindow()
@@ -528,7 +551,7 @@ class MainWindow(QMainWindow):
     def set_settings_view(self, view_widget: QWidget):
         self.settings_view = view_widget
         self.stack.removeWidget(self.settings_placeholder)
-        self.stack.insertWidget(4, view_widget)
+        self.stack.insertWidget(6, view_widget)
 
     def apply_theme(self, theme_name: str = "dark"):
         if theme_name == "light":

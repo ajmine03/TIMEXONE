@@ -32,21 +32,24 @@ class StatsSummaryCard(QFrame):
         super().__init__(parent)
         self.setProperty("class", "Card")
         self.accent_color = accent_color
+        self.setMinimumWidth(0)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(18, 16, 18, 16)
-        layout.setSpacing(6)
+        layout.setContentsMargins(14, 12, 14, 12)
+        layout.setSpacing(4)
 
         self.lbl_title = QLabel(title.upper())
-        self.lbl_title.setStyleSheet("font-size: 11px; font-weight: 700; color: #8a95af; letter-spacing: 0.8px;")
+        self.lbl_title.setStyleSheet("font-size: 11px; font-weight: 700; color: #8a95af; letter-spacing: 0.6px;")
+        self.lbl_title.setWordWrap(True)
         layout.addWidget(self.lbl_title)
 
         self.lbl_value = QLabel("—")
-        self.lbl_value.setStyleSheet(f"font-size: 22px; font-weight: bold; color: {accent_color};")
+        self.lbl_value.setStyleSheet(f"font-size: 20px; font-weight: bold; color: {accent_color};")
         layout.addWidget(self.lbl_value)
 
         self.lbl_sub = QLabel("")
         self.lbl_sub.setStyleSheet("font-size: 11px; color: #a6adc8; font-weight: 500;")
+        self.lbl_sub.setWordWrap(True)
         layout.addWidget(self.lbl_sub)
 
     def set_content(self, value: str, subtitle: str = ""):
@@ -72,8 +75,8 @@ class StatsView(QWidget):
 
     def _init_ui(self):
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(28, 22, 28, 22)
-        main_layout.setSpacing(18)
+        main_layout.setContentsMargins(20, 16, 20, 16)
+        main_layout.setSpacing(14)
 
         # ---------------------------------------------------------------------
         # 1. Header Toolbar
@@ -214,16 +217,17 @@ class StatsView(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setStyleSheet("background: transparent;")
 
         container = QWidget()
         self.content_layout = QVBoxLayout(container)
         self.content_layout.setContentsMargins(0, 4, 0, 8)
-        self.content_layout.setSpacing(16)
+        self.content_layout.setSpacing(14)
 
         # 2. Top Summary Metrics Cards (5 Cards)
         summary_row = QHBoxLayout()
-        summary_row.setSpacing(12)
+        summary_row.setSpacing(10)
 
         self.card_focus_time = StatsSummaryCard("Total Focus Time", "#6366f1")
         self.card_completed_pomos = StatsSummaryCard("Completed Pomodoros", "#10b981")
@@ -231,11 +235,11 @@ class StatsView(QWidget):
         self.card_goal_progress = StatsSummaryCard("Goal Progress", "#f59e0b")
         self.card_breaks = StatsSummaryCard("Breaks & Rest", "#a855f7")
 
-        summary_row.addWidget(self.card_focus_time)
-        summary_row.addWidget(self.card_completed_pomos)
-        summary_row.addWidget(self.card_daily_avg)
-        summary_row.addWidget(self.card_goal_progress)
-        summary_row.addWidget(self.card_breaks)
+        summary_row.addWidget(self.card_focus_time, stretch=1)
+        summary_row.addWidget(self.card_completed_pomos, stretch=1)
+        summary_row.addWidget(self.card_daily_avg, stretch=1)
+        summary_row.addWidget(self.card_goal_progress, stretch=1)
+        summary_row.addWidget(self.card_breaks, stretch=1)
         self.content_layout.addLayout(summary_row)
 
         # 3. Daily Focus Bar Chart Card

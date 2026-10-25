@@ -122,6 +122,12 @@ class PomodoroEngine:
         if getattr(self, 'state', None) and self.state.is_running:
             self._target_monotonic = time.monotonic() + self._remaining_seconds
 
+    @property
+    def progress_fraction(self) -> float:
+        if self.total_duration <= 0:
+            return 0.0
+        return max(0.0, min(1.0, 1.0 - (self._remaining_seconds / self.total_duration)))
+
     # -------------------------------------------------------------------------
     # Callback Registration
     # -------------------------------------------------------------------------

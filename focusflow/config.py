@@ -68,14 +68,32 @@ def format_date_short(d) -> str:
 
 def format_date_full(d) -> str:
     """Format date in English: 'Tuesday, December 10, 2024'."""
+    if isinstance(d, str):
+        from datetime import date
+        d = date.fromisoformat(d)
     weekday = ENGLISH_DAYS_FULL[d.weekday()]
     return f"{weekday}, {ENGLISH_MONTHS_FULL[d.month]} {d.day:02d}, {d.year}"
 
 
 def format_date_weekday(d) -> str:
     """Format date in English: 'Tue, Dec 10, 2024'."""
+    if isinstance(d, str):
+        from datetime import date
+        d = date.fromisoformat(d)
     weekday = ENGLISH_DAYS_SHORT[d.weekday()]
     return f"{weekday}, {ENGLISH_MONTHS_SHORT[d.month]} {d.day:02d}, {d.year}"
+
+
+def format_duration_short(seconds: int) -> str:
+    """Format duration in seconds to short string: '2h 15m' or '25m'."""
+    if seconds < 60:
+        return f"{seconds}s"
+    mins = seconds // 60
+    hrs = mins // 60
+    rem_m = mins % 60
+    if hrs > 0:
+        return f"{hrs}h {rem_m}m" if rem_m > 0 else f"{hrs}h"
+    return f"{mins}m"
 
 
 def format_month_year(year: int, month: int) -> str:

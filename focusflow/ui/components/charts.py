@@ -56,8 +56,8 @@ class WeeklyBarChart(QWidget):
         w = self.width()
         h = self.height()
 
-        padding_left = 32
-        padding_right = 16
+        padding_left = 30
+        padding_right = 22
         padding_top = 16
         padding_bottom = 28
 
@@ -93,7 +93,7 @@ class WeeklyBarChart(QWidget):
         # 2. Render Bars
         n_bars = len(self.data)
         slot_w = chart_w / max(1, n_bars)
-        bar_w = min(28.0, max(14.0, slot_w * 0.45))
+        bar_w = min(28.0, max(12.0, slot_w * 0.42))
 
         for idx, (label, val) in enumerate(self.data):
             slot_center = padding_left + (idx + 0.5) * slot_w
@@ -120,10 +120,12 @@ class WeeklyBarChart(QWidget):
                 painter.setPen(Qt.PenStyle.NoPen)
                 painter.drawRoundedRect(bar_rect, 6, 6)
 
-            # Day Label
-            painter.setPen(QColor("#8a95af"))
-            painter.setFont(QFont("Inter", 10, QFont.Weight.Medium))
-            lbl_rect = QRectF(slot_center - 20, h - padding_bottom + 6, 40, 18)
+            # High-contrast Day Label (unclipped with full slot centering)
+            painter.setPen(QColor("#cbd5e1"))
+            lbl_font_size = 9 if n_bars > 7 else 10
+            painter.setFont(QFont("Inter", lbl_font_size, QFont.Weight.Medium))
+            label_w = max(slot_w, 48.0)
+            lbl_rect = QRectF(slot_center - (label_w / 2.0), h - padding_bottom + 4, label_w, 20)
             painter.drawText(lbl_rect, Qt.AlignmentFlag.AlignCenter, label)
 
         painter.end()

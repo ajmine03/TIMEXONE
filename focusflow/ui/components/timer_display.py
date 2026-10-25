@@ -29,7 +29,6 @@ class TimerDisplayWidget(QWidget):
         self.task_title = ""
         self.mode_label = "Focus Session"
         self.setMinimumSize(190, 190)
-        self.setMaximumSize(230, 230)
 
         self._svg_renderer = None
         if TOMATO_PATH.exists():

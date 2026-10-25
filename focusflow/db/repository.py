@@ -562,6 +562,9 @@ class Repository:
             return DailyStats(date=date_str)
         return DailyStats(**dict(row))
 
+    def get_daily_statistics(self, date_str: str) -> DailyStats:
+        return self.get_daily_stats(date_str)
+
     def get_stats_range(self, start_date: str, end_date: str) -> List[DailyStats]:
         cursor = self.db.execute(
             "SELECT * FROM daily_statistics WHERE date >= ? AND date <= ? ORDER BY date ASC;",
