@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QFrame, QSpinBox, QCheckBox, QComboBox, QSlider, QScrollArea,
     QFormLayout, QMessageBox
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QLocale
 
 from focusflow.config import APP_NAME
 from focusflow.db.repository import Repository
@@ -112,22 +112,28 @@ class SettingsView(QWidget):
         form = QFormLayout()
         form.setSpacing(12)
 
+        eng_locale = QLocale(QLocale.Language.English, QLocale.Country.UnitedStates)
+
         self.spin_focus = QSpinBox()
+        self.spin_focus.setLocale(eng_locale)
         self.spin_focus.setRange(1, 120)
         self.spin_focus.setSuffix(" minutes")
         form.addRow("Focus Duration:", self.spin_focus)
 
         self.spin_short_break = QSpinBox()
+        self.spin_short_break.setLocale(eng_locale)
         self.spin_short_break.setRange(1, 45)
         self.spin_short_break.setSuffix(" minutes")
         form.addRow("Short Break Duration:", self.spin_short_break)
 
         self.spin_long_break = QSpinBox()
+        self.spin_long_break.setLocale(eng_locale)
         self.spin_long_break.setRange(1, 60)
         self.spin_long_break.setSuffix(" minutes")
         form.addRow("Long Break Duration:", self.spin_long_break)
 
         self.spin_interval = QSpinBox()
+        self.spin_interval.setLocale(eng_locale)
         self.spin_interval.setRange(1, 12)
         self.spin_interval.setSuffix(" pomodoros")
         form.addRow("Long Break Interval:", self.spin_interval)
@@ -185,6 +191,7 @@ class SettingsView(QWidget):
         form.setSpacing(12)
 
         self.spin_goal = QSpinBox()
+        self.spin_goal.setLocale(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
         self.spin_goal.setRange(1, 16)
         self.spin_goal.setSuffix(" hours")
         form.addRow("Daily Focus Target:", self.spin_goal)

@@ -36,6 +36,10 @@ class Task:
     def tag_list(self) -> List[str]:
         return [t.strip() for t in self.tags.split(",") if t.strip()]
 
+    @property
+    def is_completed(self) -> bool:
+        return self.status == "completed"
+
 
 @dataclass
 class PomodoroSession:
@@ -45,8 +49,9 @@ class PomodoroSession:
     start_time: str
     end_time: str
     duration_seconds: int
-    status: str                        # 'completed', 'interrupted'
+    status: str                        # 'completed', 'stopped', 'interrupted', 'cancelled'
     date: str                          # YYYY-MM-DD
+    planned_duration_seconds: int = 0
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -60,6 +65,7 @@ class DailyStats:
     tasks_completed: int = 0
     longest_session_seconds: int = 0
     interruptions_count: int = 0
+    total_break_seconds: int = 0
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -217,6 +223,14 @@ class Repository:
         cursor = self.db.execute(query, tuple(params))
         return [Task(**dict(row)) for row in cursor.fetchall()]
 
+    def get_all_tasks(self) -> List[Task]:
+        """Convenience alias for list_tasks."""
+        return self.list_tasks()
+
+    def complete_task(self, task_id: str) -> Optional[Task]:
+        """Mark a task as completed with current timestamp."""
+        return self.update_task(task_id, status="completed", completed_at=datetime.now().isoformat())
+
     def record_task_pomodoro(self, task_id: str, duration_seconds: int):
         """Increment completed pomodoros and add to total focus seconds."""
         task = self.get_task(task_id)
@@ -255,6 +269,53 @@ class Repository:
     # -------------------------------------------------------------------------
     # Pomodoro Session Operations
     # -------------------------------------------------------------------------
+    def _split_duration_by_calendar_days(self, start_iso: str, end_iso: str, duration_seconds: int) -> List[Tuple[str, int]]:
+        """
+        Split active duration across calendar days if the session crosses local midnight.
+        Returns list of (date_str, allocated_seconds).
+        """
+        start_date = start_iso[:10]
+        end_date = end_iso[:10]
+        if start_date == end_date or duration_seconds <= 0:
+            return [(start_date, duration_seconds)]
+
+        try:
+            dt_start = datetime.fromisoformat(start_iso)
+            dt_end = datetime.fromisoformat(end_iso)
+        except Exception:
+            return [(start_date, duration_seconds)]
+
+        total_span = max(1.0, (dt_end - dt_start).total_seconds())
+        result = []
+        cur_start = dt_start
+        rem_duration = duration_seconds
+
+        while cur_start < dt_end and rem_duration > 0:
+            cur_day_str = cur_start.strftime("%Y-%m-%d")
+            next_midnight = datetime(cur_start.year, cur_start.month, cur_start.day) + timedelta(days=1)
+            cur_end = min(dt_end, next_midnight)
+            span_in_day = (cur_end - cur_start).total_seconds()
+
+            if cur_end >= dt_end:
+                day_sec = rem_duration
+            else:
+                fraction = span_in_day / total_span
+                day_sec = min(rem_duration, int(round(duration_seconds * fraction)))
+
+            if day_sec > 0:
+                result.append((cur_day_str, day_sec))
+                rem_duration -= day_sec
+
+            cur_start = next_midnight
+
+        if rem_duration > 0:
+            if result:
+                result[-1] = (result[-1][0], result[-1][1] + rem_duration)
+            else:
+                result.append((start_date, duration_seconds))
+
+        return result
+
     def record_session(
         self,
         task_id: Optional[str],
@@ -263,6 +324,7 @@ class Repository:
         end_time: str,
         duration_seconds: int,
         status: str = "completed",
+        planned_duration_seconds: int = 0,
     ) -> PomodoroSession:
         session_id = str(uuid.uuid4())
         session_date = start_time[:10]  # YYYY-MM-DD
@@ -276,6 +338,7 @@ class Repository:
             duration_seconds=duration_seconds,
             status=status,
             date=session_date,
+            planned_duration_seconds=planned_duration_seconds,
         )
 
         with self.db.transaction():
@@ -283,33 +346,49 @@ class Repository:
                 """
                 INSERT INTO pomodoro_sessions (
                     id, task_id, session_type, start_time, end_time,
-                    duration_seconds, status, date
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+                    duration_seconds, status, date, planned_duration_seconds
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
                     session.id, session.task_id, session.session_type,
                     session.start_time, session.end_time, session.duration_seconds,
-                    session.status, session.date,
+                    session.status, session.date, session.planned_duration_seconds,
                 ),
             )
 
-        # If it was a focus session, update daily aggregate stats
+        # Allocate duration across calendar days if midnight was crossed
+        allocations = self._split_duration_by_calendar_days(start_time, end_time, duration_seconds)
+
         if session_type == "focus":
             pomodoro_inc = 1 if status == "completed" else 0
-            interruption_inc = 1 if status == "interrupted" else 0
-            self._update_daily_stats(
-                date_str=session_date,
-                focus_seconds=duration_seconds,
-                pomodoros=pomodoro_inc,
-                interruptions=interruption_inc,
-            )
+            interruption_inc = 1 if status in ("interrupted", "stopped") else 0
 
-            # If associated with a task:
-            if task_id:
+            for idx, (d_str, d_sec) in enumerate(allocations):
+                is_last_day = (idx == len(allocations) - 1)
+                self._update_daily_stats(
+                    date_str=d_str,
+                    focus_seconds=d_sec,
+                    break_seconds=0,
+                    pomodoros=pomodoro_inc if is_last_day else 0,
+                    interruptions=interruption_inc if is_last_day else 0,
+                )
+
+            # If associated with a task, credit actual focus time
+            if task_id and duration_seconds > 0:
                 if status == "completed":
                     self.record_task_pomodoro(task_id, duration_seconds)
-                elif duration_seconds >= 15:
+                else:
                     self.record_task_focus_time(task_id, duration_seconds)
+
+        elif session_type in ("short_break", "long_break"):
+            for d_str, d_sec in allocations:
+                self._update_daily_stats(
+                    date_str=d_str,
+                    focus_seconds=0,
+                    break_seconds=d_sec,
+                    pomodoros=0,
+                    interruptions=0,
+                )
 
         return session
 
@@ -342,6 +421,10 @@ class Repository:
 
         cursor = self.db.execute(query, tuple(params))
         return [PomodoroSession(**dict(row)) for row in cursor.fetchall()]
+
+    def get_session_history(self, limit: int = 100) -> List[PomodoroSession]:
+        """Convenience alias for list_sessions."""
+        return self.list_sessions(limit=limit)
 
     def get_dates_with_sessions(self, year: int, month: int) -> set:
         """Return a set of day numbers (1-31) in the given year/month that have recorded sessions."""
@@ -447,7 +530,8 @@ class Repository:
     def _update_daily_stats(
         self,
         date_str: str,
-        focus_seconds: int,
+        focus_seconds: int = 0,
+        break_seconds: int = 0,
         pomodoros: int = 0,
         tasks_completed: int = 0,
         interruptions: int = 0,
@@ -458,16 +542,17 @@ class Repository:
                 """
                 INSERT INTO daily_statistics (
                     date, total_focus_seconds, pomodoros_completed,
-                    tasks_completed, longest_session_seconds, interruptions_count
-                ) VALUES (?, ?, ?, ?, ?, ?)
+                    tasks_completed, longest_session_seconds, interruptions_count, total_break_seconds
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(date) DO UPDATE SET
                     total_focus_seconds = total_focus_seconds + excluded.total_focus_seconds,
                     pomodoros_completed = pomodoros_completed + excluded.pomodoros_completed,
                     tasks_completed = tasks_completed + excluded.tasks_completed,
                     longest_session_seconds = MAX(longest_session_seconds, excluded.longest_session_seconds),
-                    interruptions_count = interruptions_count + excluded.interruptions_count;
+                    interruptions_count = interruptions_count + excluded.interruptions_count,
+                    total_break_seconds = total_break_seconds + excluded.total_break_seconds;
                 """,
-                (date_str, focus_seconds, pomodoros, tasks_completed, focus_seconds, interruptions),
+                (date_str, focus_seconds, pomodoros, tasks_completed, focus_seconds, interruptions, break_seconds),
             )
 
     def get_daily_stats(self, date_str: str) -> DailyStats:
@@ -493,6 +578,8 @@ class Repository:
             result.append(stats_map.get(d_str, DailyStats(date=d_str)))
             cur_date += timedelta(days=1)
         return result
+
+    get_daily_stats_range = get_stats_range
 
     def get_productivity_streak(self) -> int:
         """Calculate consecutive days of reaching at least one completed pomodoro."""

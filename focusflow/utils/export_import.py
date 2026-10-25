@@ -6,12 +6,13 @@ Supports CSV, JSON, and SQLite database snapshots.
 import csv
 import json
 import shutil
-from datetime import datetime
+from datetime import datetime, date
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 from focusflow.config import APP_BACKUP_DIR
 from focusflow.db.repository import Repository, Task, PomodoroSession
+from focusflow.core.analytics_service import AnalyticsService
 
 
 class DataManager:
@@ -19,6 +20,7 @@ class DataManager:
 
     def __init__(self, repository: Repository):
         self.repo = repository
+        self.analytics = AnalyticsService(repository)
 
     # -------------------------------------------------------------------------
     # CSV Export / Import
@@ -27,22 +29,82 @@ class DataManager:
         """Export all recorded pomodoro sessions to CSV."""
         sessions = self.repo.list_sessions(limit=100000)
         output_file.parent.mkdir(parents=True, exist_ok=True)
+        tasks_map = {t.id: t.title for t in self.repo.list_tasks()}
 
         with open(output_file, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            writer.writerow(["id", "date", "start_time", "end_time", "duration_seconds", "session_type", "status", "task_id", "task_title"])
+            writer.writerow([
+                "id", "date", "start_time", "end_time", "duration_seconds",
+                "planned_duration_seconds", "session_type", "status", "task_id", "task_title"
+            ])
             for s in sessions:
-                task_title = ""
-                if s.task_id:
-                    t = self.repo.get_task(s.task_id)
-                    if t:
-                        task_title = t.title
+                if not s.task_id:
+                    task_title = "General Focus"
+                elif s.task_id in tasks_map:
+                    task_title = tasks_map[s.task_id]
+                else:
+                    task_title = "[Deleted Task]"
+
                 writer.writerow([
                     s.id, s.date, s.start_time, s.end_time,
-                    s.duration_seconds, s.session_type, s.status,
+                    s.duration_seconds, getattr(s, "planned_duration_seconds", 0),
+                    s.session_type, s.status,
                     s.task_id or "", task_title
                 ])
         return len(sessions)
+
+    def export_daily_totals_csv(self, output_file: Path, start_date: date, end_date: date) -> int:
+        """Export aggregated daily focus and break totals to CSV."""
+        trend = self.analytics.get_daily_trend(start_date, end_date)
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(output_file, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                "date", "day_name", "focus_seconds", "focus_minutes",
+                "completed_pomodoros", "break_seconds", "goal_seconds", "goal_met"
+            ])
+            for item in trend:
+                writer.writerow([
+                    item.date_str,
+                    item.day_name,
+                    item.focus_seconds,
+                    round(item.focus_seconds / 60.0, 1),
+                    item.completed_pomodoros,
+                    item.break_seconds,
+                    item.goal_seconds,
+                    "Yes" if item.focus_seconds >= item.goal_seconds else "No",
+                ])
+        return len(trend)
+
+    def export_task_focus_csv(self, output_file: Path, start_date: Optional[date] = None, end_date: Optional[date] = None) -> int:
+        """Export focus breakdown by task to CSV."""
+        if start_date is None or end_date is None:
+            s_d, e_d, _ = self.analytics.resolve_date_range("all_time")
+        else:
+            s_d, e_d = start_date, end_date
+
+        tasks = self.analytics.get_task_breakdown(s_d, e_d)
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(output_file, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                "task_id", "task_title", "focus_seconds", "focus_minutes",
+                "completed_pomodoros", "estimated_pomodoros", "is_completed", "pct_of_total"
+            ])
+            for item in tasks:
+                writer.writerow([
+                    item.task_id or "",
+                    item.task_title,
+                    item.focus_seconds,
+                    round(item.focus_seconds / 60.0, 1),
+                    item.completed_pomodoros,
+                    item.estimated_pomodoros,
+                    "Completed" if item.is_completed else "Active",
+                    f"{item.pct_of_total:.1f}%",
+                ])
+        return len(tasks)
 
     def export_tasks_csv(self, output_file: Path) -> int:
         """Export all tasks to CSV."""

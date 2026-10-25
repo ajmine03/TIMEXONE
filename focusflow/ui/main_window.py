@@ -241,7 +241,7 @@ class MainWindow(QMainWindow):
             ("dashboard", "🏠  Dashboard", 0),
             ("tasks", "☑  Tasks", 1),
             ("timer", "⏰  Timer", 0),
-            ("analytics", "📊  Analytics", 2),
+            ("analytics", "📊  Analytics", 3),
             ("calendar", "📅  Calendar", 0),
             ("settings", "⚙  Settings", 4),
         ]
@@ -466,6 +466,16 @@ class MainWindow(QMainWindow):
         for k, btn in self.nav_buttons.items():
             btn.setChecked(k == active_key)
         self.stack.setCurrentIndex(index)
+        if index == 0 and hasattr(self, "dashboard_view"):
+            self.dashboard_view.refresh_dashboard()
+        elif index == 1 and hasattr(self, "tasks_view"):
+            self.tasks_view.refresh_tasks()
+        elif index == 2 and hasattr(self, "history_view"):
+            self.history_view.refresh_history()
+        elif index == 3 and hasattr(self, "stats_view"):
+            self.stats_view.refresh_stats()
+        elif index == 4 and hasattr(self, "settings_view"):
+            self.settings_view.load_settings()
 
     def _on_task_focus_requested(self, task_id: str):
         self._on_nav_clicked(0, "dashboard")
@@ -489,7 +499,17 @@ class MainWindow(QMainWindow):
         self.activateWindow()
 
     def show_history(self):
-        self._on_nav_clicked(2, "analytics")
+        for btn in self.nav_buttons.values():
+            btn.setChecked(False)
+        self.stack.setCurrentIndex(2)
+        if hasattr(self, "history_view"):
+            self.history_view.refresh_history()
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    def show_analytics(self):
+        self._on_nav_clicked(3, "analytics")
         self.show()
         self.raise_()
         self.activateWindow()
@@ -501,10 +521,12 @@ class MainWindow(QMainWindow):
         self.activateWindow()
 
     def set_stats_view(self, view_widget: QWidget):
+        self.stats_view = view_widget
         self.stack.removeWidget(self.stats_placeholder)
         self.stack.insertWidget(3, view_widget)
 
     def set_settings_view(self, view_widget: QWidget):
+        self.settings_view = view_widget
         self.stack.removeWidget(self.settings_placeholder)
         self.stack.insertWidget(4, view_widget)
 

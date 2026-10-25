@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 
+from focusflow.config import format_date_full, ENGLISH_MONTHS_FULL
 from focusflow.db.repository import Repository, PomodoroSession
 
 
@@ -52,22 +53,43 @@ class SessionHistoryCard(QFrame):
         layout.addLayout(center_layout, stretch=1)
 
         # 3. Duration
-        mins = max(1, self.session.duration_seconds // 60)
-        dur_lbl = QLabel(f"{mins} min")
-        dur_lbl.setStyleSheet("font-size: 13px; font-weight: bold; color: #9399b2; min-width: 60px;")
+        secs = self.session.duration_seconds
+        if secs < 60:
+            dur_str = f"{secs}s"
+        else:
+            mins = secs // 60
+            rem_s = secs % 60
+            if mins < 10 and rem_s > 0:
+                dur_str = f"{mins}m {rem_s}s"
+            else:
+                dur_str = f"{mins} min"
+
+        if getattr(self.session, "planned_duration_seconds", 0) > 0 and self.session.status != "completed":
+            p_mins = self.session.planned_duration_seconds // 60
+            dur_lbl = QLabel(f"{dur_str} ({p_mins}m plan)")
+        else:
+            dur_lbl = QLabel(dur_str)
+
+        dur_lbl.setStyleSheet("font-size: 13px; font-weight: bold; color: #9399b2; min-width: 80px;")
         dur_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(dur_lbl)
 
         # 4. Status Badge
-        status_lbl = QLabel(self.session.status.upper())
-        if self.session.status == "completed":
+        status = (self.session.status or "completed").lower()
+        status_lbl = QLabel(status.upper())
+        if status == "completed":
             status_lbl.setStyleSheet(
                 "background-color: #10b98122; color: #10b981; border: 1px solid #10b98144; "
                 "border-radius: 4px; padding: 3px 8px; font-size: 10px; font-weight: bold;"
             )
-        else:
+        elif status == "stopped":
             status_lbl.setStyleSheet(
                 "background-color: #f59e0b22; color: #f59e0b; border: 1px solid #f59e0b44; "
+                "border-radius: 4px; padding: 3px 8px; font-size: 10px; font-weight: bold;"
+            )
+        else:
+            status_lbl.setStyleSheet(
+                "background-color: #ef444422; color: #ef4444; border: 1px solid #ef444444; "
                 "border-radius: 4px; padding: 3px 8px; font-size: 10px; font-weight: bold;"
             )
         layout.addWidget(status_lbl)
@@ -186,7 +208,13 @@ class HistoryView(QWidget):
         # Filter by search
         filtered_sessions = []
         for s in sessions:
-            title = tasks_map.get(s.task_id, "General Focus" if not s.task_id else "")
+            if not s.task_id:
+                title = "General Focus"
+            elif s.task_id in tasks_map:
+                title = tasks_map[s.task_id]
+            else:
+                title = "[Deleted Task]"
+
             if search_q and (search_q not in title.lower() and search_q not in s.session_type.lower()):
                 continue
             filtered_sessions.append((s, title))
@@ -201,11 +229,19 @@ class HistoryView(QWidget):
 
         # Update summary
         total_secs = sum(s.duration_seconds for s, _ in filtered_sessions if s.session_type == "focus")
-        completed_cnt = sum(1 for s, _ in filtered_sessions if s.status == "completed")
+        completed_poms = sum(
+            1 for s, _ in filtered_sessions
+            if s.session_type == "focus" and (s.status or "").lower() == "completed"
+        )
+        total_breaks = sum(1 for s, _ in filtered_sessions if s.session_type != "focus")
         hrs = total_secs // 3600
         mins = (total_secs % 3600) // 60
         time_str = f"{hrs}h {mins}m" if hrs > 0 else f"{mins}m"
-        self.summary_label.setText(f"{len(filtered_sessions)} sessions ({completed_cnt} completed) — {time_str} focused")
+
+        break_info = f", {total_breaks} breaks" if total_breaks > 0 else ""
+        self.summary_label.setText(
+            f"{len(filtered_sessions)} sessions ({completed_poms} completed pomodoros{break_info}) — {time_str} focused"
+        )
 
         # Group by date
         current_date_group = None
@@ -215,11 +251,11 @@ class HistoryView(QWidget):
                 current_date_group = s.date
                 d_obj = datetime.strptime(s.date, "%Y-%m-%d").date()
                 if d_obj == today:
-                    header_str = f"Today — {d_obj.strftime('%B %d, %Y')}"
+                    header_str = f"Today — {ENGLISH_MONTHS_FULL[d_obj.month]} {d_obj.day:02d}, {d_obj.year}"
                 elif d_obj == today - timedelta(days=1):
-                    header_str = f"Yesterday — {d_obj.strftime('%B %d, %Y')}"
+                    header_str = f"Yesterday — {ENGLISH_MONTHS_FULL[d_obj.month]} {d_obj.day:02d}, {d_obj.year}"
                 else:
-                    header_str = d_obj.strftime("%A, %B %d, %Y")
+                    header_str = format_date_full(d_obj)
 
                 date_header = QLabel(header_str)
                 date_header.setStyleSheet("font-size: 13px; font-weight: bold; color: #89b4fa; padding-top: 10px;")

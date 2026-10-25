@@ -78,10 +78,20 @@ CREATE TABLE IF NOT EXISTS application_usage (
 CREATE INDEX IF NOT EXISTS idx_app_usage_date ON application_usage(date);
 """
 
+SCHEMA_V2 = """
+ALTER TABLE pomodoro_sessions ADD COLUMN planned_duration_seconds INTEGER DEFAULT 0;
+ALTER TABLE daily_statistics ADD COLUMN total_break_seconds INTEGER DEFAULT 0;
+"""
+
 # Dictionary of migrations (version: (description, sql_commands))
 MIGRATIONS = {
     1: (
         "Initial FocusFlow schema with tasks, sessions, statistics, and preferences",
         INITIAL_SCHEMA_V1,
     ),
+    2: (
+        "Add planned_duration_seconds to sessions and total_break_seconds to daily_statistics",
+        SCHEMA_V2,
+    ),
 }
+

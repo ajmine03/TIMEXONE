@@ -58,11 +58,18 @@ DEFAULT_IDLE_THRESHOLD_SECONDS = 5 * 60 # 5 minutes
 ENGLISH_MONTHS_SHORT = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 ENGLISH_MONTHS_FULL = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 ENGLISH_DAYS_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+ENGLISH_DAYS_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 
 def format_date_short(d) -> str:
     """Format date in English: 'Dec 10, 2024'."""
     return f"{ENGLISH_MONTHS_SHORT[d.month]} {d.day:02d}, {d.year}"
+
+
+def format_date_full(d) -> str:
+    """Format date in English: 'Tuesday, December 10, 2024'."""
+    weekday = ENGLISH_DAYS_FULL[d.weekday()]
+    return f"{weekday}, {ENGLISH_MONTHS_FULL[d.month]} {d.day:02d}, {d.year}"
 
 
 def format_date_weekday(d) -> str:

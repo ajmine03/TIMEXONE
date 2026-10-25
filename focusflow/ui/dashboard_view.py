@@ -1252,8 +1252,13 @@ class DashboardView(QWidget):
             lbl_name.setStyleSheet("color: #ffffff; font-size: 12px; font-weight: 500; border: none; background: transparent;")
             text_col.addWidget(lbl_name)
 
-            dur_mins = max(1, s.duration_seconds // 60)
-            lbl_dur = QLabel(f"{dur_mins} min")
+            if s.duration_seconds < 60:
+                dur_text = f"{s.duration_seconds}s"
+            else:
+                dur_text = f"{s.duration_seconds // 60} min"
+            if s.status and s.status != "completed":
+                dur_text += f" ({s.status})"
+            lbl_dur = QLabel(dur_text)
             lbl_dur.setStyleSheet("color: #8a95af; font-size: 10px; border: none; background: transparent;")
             text_col.addWidget(lbl_dur)
 
