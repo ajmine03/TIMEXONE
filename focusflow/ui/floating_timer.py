@@ -379,7 +379,15 @@ class FloatingTimerWidget(QWidget):
 
         self.time_label = QLabel("25:00", self.frame)
         self.time_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.time_label.setStyleSheet("color: #ffffff; font-size: 26px; font-weight: bold; font-family: 'Inter', sans-serif;")
+        self.time_label.setStyleSheet("color: #ffffff; font-size: 26px; font-weight: bold; font-family: 'Inter', -apple-system, monospace;")
+        time_font = self.time_label.font()
+        time_font.setPointSize(26)
+        time_font.setBold(True)
+        try:
+            time_font.setFeature(QFont.Tag.fromString("tnum"), 1)
+        except Exception:
+            pass
+        self.time_label.setFont(time_font)
         center_layout.addWidget(self.time_label)
 
         self.task_label = QLabel("Focus Session", self.frame)

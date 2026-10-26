@@ -79,12 +79,8 @@ class TimerDisplayWidget(QWidget):
         painter.setPen(track_pen)
         painter.drawArc(rect, 220 * 16, -260 * 16)
 
-        # 2. Glowing Multi-color Progress Arc (Matching Image 4)
-        # When idle, show the ~72% full arc matching Image 4 at 25:00; when running, animate with remaining time
-        if self.state == TimerState.IDLE:
-            progress = 0.72
-        else:
-            progress = max(0.02, min(1.0, self.remaining_seconds / self.total_duration))
+        # 2. Glowing Multi-color Progress Arc
+        progress = max(0.02, min(1.0, self.remaining_seconds / max(1, self.total_duration)))
 
         # 4-stop vibrant gradient: Electric Blue -> Purple -> Pink -> Coral Orange
         grad = QLinearGradient(cx - radius, cy, cx + radius, cy)
@@ -131,6 +127,11 @@ class TimerDisplayWidget(QWidget):
         painter.setPen(QColor("#ffffff"))
         font_size = int(radius * 0.40)
         time_font = QFont("Inter", font_size, QFont.Weight.Bold)
+        time_font.setFamilies(["Inter", "JetBrains Mono", "monospace"])
+        try:
+            time_font.setFeature(QFont.Tag.fromString("tnum"), 1)
+        except Exception:
+            pass
         time_font.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1)
         painter.setFont(time_font)
 
