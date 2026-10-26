@@ -205,6 +205,11 @@ class DraggableHeader(QWidget):
         self._dragging = False
         self._drag_start = QPoint()
 
+    def mouseDoubleClickEvent(self, event: QMouseEvent):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.target_window.toggle_compact_mode()
+            event.accept()
+
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton:
             handle = self.target_window.windowHandle()
@@ -339,6 +344,14 @@ class FloatingTimerWidget(QWidget):
         self.btn_pin.clicked.connect(self.toggle_always_on_top)
         header_layout.addWidget(self.btn_pin)
 
+        # Compact / Expand button (ছোট / বড় করার বাটন)
+        self.btn_compact = QPushButton("⤡", self.header)
+        self.btn_compact.setFixedSize(20, 20)
+        self.btn_compact.setToolTip("Compact Mode (ছোট করুন / ডাবল ক্লিক)")
+        self.btn_compact.setStyleSheet(btn_style)
+        self.btn_compact.clicked.connect(self.toggle_compact_mode)
+        header_layout.addWidget(self.btn_compact)
+
         # Minimize to dashboard / tray
         self.btn_min = QPushButton("—", self.header)
         self.btn_min.setFixedSize(20, 20)
@@ -470,7 +483,7 @@ class FloatingTimerWidget(QWidget):
         frame_layout.addLayout(controls_layout)
         root_layout.addWidget(self.frame)
 
-        self.resize(220, 150)
+        self._apply_geometry_mode()
 
     def _connect_signals(self):
         self.engine.subscribe_tick(self._on_tick)
@@ -587,13 +600,47 @@ class FloatingTimerWidget(QWidget):
         if self.always_on_top:
             self.raise_()
 
+    def _apply_geometry_mode(self):
+        """Enforces fixed dimensions for standard vs compact mode to prevent KWin snapping."""
+        if self.isMaximized():
+            self.showNormal()
+
+        time_font = self.time_label.font()
+        if self.is_compact:
+            self.btn_compact.setText("⤢")
+            self.btn_compact.setToolTip("Standard Mode (বড় করুন / ডাবল ক্লিক)")
+            self.task_label.hide()
+            self.btn_restart.hide()
+            self.btn_stop.hide()
+            self.btn_play_pause.setFixedSize(30, 30)
+            time_font.setPointSize(21)
+            self.time_label.setFont(time_font)
+            self.setFixedSize(180, 100)
+        else:
+            self.btn_compact.setText("⤡")
+            self.btn_compact.setToolTip("Compact Mode (ছোট করুন / ডাবল ক্লিক)")
+            self.task_label.show()
+            self.btn_restart.show()
+            self.btn_stop.show()
+            self.btn_play_pause.setFixedSize(38, 38)
+            time_font.setPointSize(26)
+            self.time_label.setFont(time_font)
+            self.setFixedSize(220, 150)
+
+    def reset_to_default_size(self):
+        """Emergency reset if window manager ever forces abnormal geometry."""
+        self.showNormal()
+        self.is_compact = False
+        self.repo.set_preference("floating_compact", False)
+        self._apply_geometry_mode()
+        safe_pos = self.ensure_on_screen(self.pos(), self.size())
+        self.move(safe_pos)
+        self.save_position()
+
     def toggle_compact_mode(self):
         self.is_compact = not self.is_compact
         self.repo.set_preference("floating_compact", self.is_compact)
-        if self.is_compact:
-            self.resize(180, 110)
-        else:
-            self.resize(220, 150)
+        self._apply_geometry_mode()
 
     def toggle_auto_hide_controls(self):
         self.auto_hide_controls = not self.auto_hide_controls
@@ -627,6 +674,19 @@ class FloatingTimerWidget(QWidget):
         act_skip = QAction("Skip Session", self)
         act_skip.triggered.connect(self.engine.skip)
         menu.addAction(act_skip)
+
+        menu.addSeparator()
+
+        # Compact / Full size toggle
+        act_compact = QAction("Compact Mode (ছোট করুন)", self)
+        act_compact.setCheckable(True)
+        act_compact.setChecked(self.is_compact)
+        act_compact.triggered.connect(self.toggle_compact_mode)
+        menu.addAction(act_compact)
+
+        act_reset = QAction("Reset Window Size (সাইজ রিস্টোর)", self)
+        act_reset.triggered.connect(self.reset_to_default_size)
+        menu.addAction(act_reset)
 
         menu.addSeparator()
 

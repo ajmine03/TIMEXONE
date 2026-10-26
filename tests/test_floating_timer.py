@@ -78,11 +78,32 @@ class TestFloatingTimer(unittest.TestCase):
 
     def test_compact_mode_toggle(self):
         widget = FloatingTimerWidget(self.engine, self.task_manager, self.repo)
-        initial_mode = widget.is_compact
+        self.assertFalse(widget.is_compact)
+        self.assertEqual(widget.size(), QSize(220, 150))
+        self.assertEqual(widget.btn_compact.text(), "⤡")
 
         widget.toggle_compact_mode()
-        self.assertEqual(widget.is_compact, not initial_mode)
-        self.assertEqual(self.repo.get_preference("floating_compact"), not initial_mode)
+        self.assertTrue(widget.is_compact)
+        self.assertEqual(widget.size(), QSize(180, 100))
+        self.assertEqual(widget.btn_compact.text(), "⤢")
+        self.assertEqual(self.repo.get_preference("floating_compact"), True)
+
+        widget.toggle_compact_mode()
+        self.assertFalse(widget.is_compact)
+        self.assertEqual(widget.size(), QSize(220, 150))
+        self.assertEqual(widget.btn_compact.text(), "⤡")
+        self.assertEqual(self.repo.get_preference("floating_compact"), False)
+        widget.close()
+
+    def test_reset_to_default_size(self):
+        widget = FloatingTimerWidget(self.engine, self.task_manager, self.repo)
+        widget.toggle_compact_mode()
+        self.assertTrue(widget.is_compact)
+
+        widget.reset_to_default_size()
+        self.assertFalse(widget.is_compact)
+        self.assertEqual(widget.size(), QSize(220, 150))
+        self.assertEqual(self.repo.get_preference("floating_compact"), False)
         widget.close()
 
     def test_auto_hide_controls_toggle(self):
