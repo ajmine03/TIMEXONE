@@ -148,16 +148,20 @@ class FocusFlowApp:
             self.engine.stop(save_interrupted=False)
 
     def _setup_heartbeat_timer(self):
-        """1-second tick loop driving timer engine, idle checks, and reminders."""
+        """Precise heartbeat loop driving timer engine, idle checks, and reminders."""
+        self._heartbeat_ticks = 0
         self.timer = QTimer()
-        self.timer.setInterval(1000)
+        self.timer.setTimerType(Qt.TimerType.PreciseTimer)
+        self.timer.setInterval(100)
         self.timer.timeout.connect(self._on_heartbeat)
         self.timer.start()
 
     def _on_heartbeat(self):
         self.engine.tick()
-        self.reminders.check_reminders()
-        self.idle_detector.check_idle()
+        self._heartbeat_ticks = (getattr(self, "_heartbeat_ticks", 0) + 1) % 10
+        if self._heartbeat_ticks == 0:
+            self.reminders.check_reminders()
+            self.idle_detector.check_idle()
 
     def _toggle_floating_timer(self):
         if self.floating_timer.isVisible():

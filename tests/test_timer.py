@@ -233,6 +233,19 @@ class TestTimerEngine(unittest.TestCase):
         self.assertEqual(eng.completed_cycles_today, 0)
         self.assertEqual(eng._current_day, date.today())
 
+    def test_tick_loop_no_monotonic_drift(self):
+        """Verify that repeated tick() calls do NOT push target_monotonic forward."""
+        eng = PomodoroEngine(self.repo, focus_duration=1500)
+        eng.start()
+        initial_target = eng._target_monotonic
+
+        # Multiple immediate ticks must never advance target_monotonic
+        for _ in range(10):
+            eng.tick()
+            self.assertEqual(eng._target_monotonic, initial_target)
+
+        self.assertEqual(eng.remaining_seconds, 1500)
+
 
 if __name__ == "__main__":
     unittest.main()

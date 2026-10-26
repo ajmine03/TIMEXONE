@@ -508,15 +508,17 @@ class PomodoroEngine:
         remaining = int(math.ceil(self._target_monotonic - now_mono))
 
         if remaining <= 0:
-            self.remaining_seconds = 0
+            self._remaining_seconds = 0
             self._notify_tick()
             self._handle_completed()
         else:
-            self.remaining_seconds = remaining
-            self._notify_tick()
-            # Persist state periodically
-            if remaining % 5 == 0:
-                self.persist_active_state()
+            prev = self._remaining_seconds
+            self._remaining_seconds = remaining
+            if remaining != prev:
+                self._notify_tick()
+                # Persist state periodically
+                if remaining % 5 == 0:
+                    self.persist_active_state()
 
     def _handle_completed(self):
         """Handles expiration of a timer session with idempotent execution."""
